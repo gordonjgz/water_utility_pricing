@@ -29,13 +29,17 @@ big_text <- theme(text = element_text(size=24))
 
 
 #### Prepare #####
-r_history_agg_0 = 24358482.7035515
-cs_history_agg_0 = -1.12813803e+17
-q_history_agg_0 = 1873818.19426824
+r_history_agg_0 = 26197351.09150049
+cs_history_agg_0 = -1.13182266e+17
+q_history_agg_0 = 1999930.37964376
+
+
+r_agg_0 = 7258745.08835472
+cs_agg_0 = -4.34379253e+17
+q_agg_0 = 794810.84743965
 
 q = seq(0.5, 75, by = 0.2)
 
-### Final Price Pic ####
 gen_p = function(p_vector, q) {
   p = p_vector[1:5]
   t = p_vector[6:9]
@@ -81,7 +85,7 @@ gen_p = function(p_vector, q) {
   return(result)
 }
 
-
+#####
 avg_info_avg_bound_mean_pl = read_csv("../ramsey_price_result/price_detail_results/avg_info_avg_bound_mean_pl.csv")
 avg_info_avg_bound_mean_ql = read_csv("../ramsey_price_result/price_detail_results/avg_info_avg_bound_mean_ql.csv")
 avg_info_avg_bound_mean_fcl = read_csv("../ramsey_price_result/price_detail_results/avg_info_avg_bound_mean_fcl.csv")
@@ -94,20 +98,61 @@ avg_info_extreme_bound_mean_pl = read_csv("../ramsey_price_result/price_detail_r
 avg_info_extreme_bound_mean_ql = read_csv("../ramsey_price_result/price_detail_results/avg_info_extreme_bound_mean_ql.csv")
 avg_info_extreme_bound_mean_fcl = read_csv("../ramsey_price_result/price_detail_results/avg_info_extreme_bound_mean_fcl.csv")
 
-avg_info_extreme_bound_var_pl = read_csv("../ramsey_price_result/price_detail_results/avg_info_extreme_bound_var_pl.csv")
-avg_info_extreme_bound_var_ql = read_csv("../ramsey_price_result/price_detail_results/avg_info_extreme_bound_var_ql.csv")
-avg_info_extreme_bound_var_fcl = read_csv("../ramsey_price_result/price_detail_results/avg_info_extreme_bound_var_fcl.csv")
 
+avg_info_avg_bound_mean = rbind(avg_info_avg_bound_mean_pl, avg_info_avg_bound_mean_ql, avg_info_avg_bound_mean_fcl)
+avg_info_avg_bound_var = rbind(avg_info_avg_bound_var_pl, avg_info_avg_bound_var_ql, avg_info_avg_bound_var_fcl)
+avg_info_extreme_bound_mean = rbind(avg_info_extreme_bound_mean_pl, avg_info_extreme_bound_mean_ql, avg_info_extreme_bound_mean_fcl)
+
+
+#####
+current_info_avg_bound_mean_pl = read_csv("../ramsey_price_result/price_detail_results/current_info_avg_bound_mean_pl.csv")
+current_info_avg_bound_mean_ql = read_csv("../ramsey_price_result/price_detail_results/current_info_avg_bound_mean_ql.csv")
+current_info_avg_bound_mean_fcl = read_csv("../ramsey_price_result/price_detail_results/current_info_avg_bound_mean_fcl.csv")
+
+current_info_avg_bound_var_pl = read_csv("../ramsey_price_result/price_detail_results/current_info_avg_bound_var_pl.csv")
+current_info_avg_bound_var_ql = read_csv("../ramsey_price_result/price_detail_results/current_info_avg_bound_var_ql.csv")
+current_info_avg_bound_var_fcl = read_csv("../ramsey_price_result/price_detail_results/current_info_avg_bound_var_fcl.csv")
+
+current_info_logr_bound_mean_pl = read_csv("../ramsey_price_result/price_detail_results/current_info_logr_bound_mean_pl.csv")
+current_info_logr_bound_mean_ql = read_csv("../ramsey_price_result/price_detail_results/current_info_logr_bound_mean_ql.csv")
+current_info_logr_bound_mean_fcl = read_csv("../ramsey_price_result/price_detail_results/current_info_logr_bound_mean_fcl.csv")
+
+current_info_logr_bound_var_pl = read_csv("../ramsey_price_result/price_detail_results/current_info_logr_bound_var_pl.csv")
+current_info_logr_bound_var_ql = read_csv("../ramsey_price_result/price_detail_results/current_info_logr_bound_var_ql.csv")
+current_info_logr_bound_var_fcl = read_csv("../ramsey_price_result/price_detail_results/current_info_logr_bound_var_fcl.csv")
+
+current_info_gamma05_bound_mean_pl = read_csv("../ramsey_price_result/price_detail_results/current_info_gamma05_bound_mean_pl.csv")
+current_info_gamma05_bound_mean_ql = read_csv("../ramsey_price_result/price_detail_results/current_info_gamma05_bound_mean_ql.csv")
+current_info_gamma05_bound_mean_fcl = read_csv("../ramsey_price_result/price_detail_results/current_info_gamma05_bound_mean_fcl.csv")
+
+current_info_gamma05_bound_var_pl = read_csv("../ramsey_price_result/price_detail_results/current_info_gamma05_bound_var_pl.csv")
+current_info_gamma05_bound_var_ql = read_csv("../ramsey_price_result/price_detail_results/current_info_gamma05_bound_var_ql.csv")
+current_info_gamma05_bound_var_fcl = read_csv("../ramsey_price_result/price_detail_results/current_info_gamma05_bound_var_fcl.csv")
+
+#current_info_extreme_bound_mean_pl = read_csv("../ramsey_price_result/price_detail_results/current_info_extreme_bound_mean_pl.csv")
+#current_info_extreme_bound_mean_ql = read_csv("../ramsey_price_result/price_detail_results/current_info_extreme_bound_mean_ql.csv")
+#current_info_extreme_bound_mean_fcl = read_csv("../ramsey_price_result/price_detail_results/current_info_extreme_bound_mean_fcl.csv")
+
+#current_info_extreme_bound_var_pl = read_csv("../ramsey_price_result/price_detail_results/current_info_extreme_bound_var_pl.csv")
+#current_info_extreme_bound_var_ql = read_csv("../ramsey_price_result/price_detail_results/current_info_extreme_bound_var_ql.csv")
+#current_info_extreme_bound_var_fcl = read_csv("../ramsey_price_result/price_detail_results/current_info_extreme_bound_var_fcl.csv")
 
 pv0 = c(3.09,5.01,8.54,12.9,14.41,2,6,11,20,8.5,10.8,16.5,37,37)
 statusquo = gen_p(pv0, q)
 statusquo$step = "status_quo"
 
+current_info_avg_bound_mean = rbind(current_info_avg_bound_mean_pl, current_info_avg_bound_mean_ql, current_info_avg_bound_mean_fcl)
+current_info_avg_bound_var = rbind(current_info_avg_bound_var_pl, current_info_avg_bound_var_ql, current_info_avg_bound_var_fcl)
 
-avg_info_avg_bound_mean = rbind(avg_info_avg_bound_mean_pl, avg_info_avg_bound_mean_ql, avg_info_avg_bound_mean_fcl)
-avg_info_avg_bound_var = rbind(avg_info_avg_bound_var_pl, avg_info_avg_bound_var_ql, avg_info_avg_bound_var_fcl)
-avg_info_extreme_bound_mean = rbind(avg_info_extreme_bound_mean_pl, avg_info_extreme_bound_mean_ql, avg_info_extreme_bound_mean_fcl)
-avg_info_extreme_bound_var = rbind(avg_info_extreme_bound_var_pl, avg_info_extreme_bound_var_ql, avg_info_extreme_bound_var_fcl)
+current_info_logr_bound_mean = rbind(current_info_logr_bound_mean_pl, current_info_logr_bound_mean_ql, current_info_logr_bound_mean_fcl)
+current_info_logr_bound_var = rbind(current_info_logr_bound_var_pl, current_info_logr_bound_var_ql, current_info_logr_bound_var_fcl)
+
+current_info_gamma05_bound_mean = rbind(current_info_gamma05_bound_mean_pl, current_info_gamma05_bound_mean_ql, current_info_gamma05_bound_mean_fcl)
+current_info_gamma05_bound_var = rbind(current_info_gamma05_bound_var_pl, current_info_gamma05_bound_var_ql, current_info_gamma05_bound_var_fcl)
+
+#current_info_extreme_bound_mean = rbind(current_info_extreme_bound_mean_pl, current_info_extreme_bound_mean_ql, current_info_extreme_bound_mean_fcl)
+#current_info_extreme_bound_var = rbind(current_info_extreme_bound_var_pl, current_info_extreme_bound_var_ql, current_info_extreme_bound_var_fcl)
+
 
 ############################################################
 ################## avg_info_avg_bound_mean ##############################
@@ -117,7 +162,7 @@ avg_info_avg_bound_mean_info <- lapply(avg_info_avg_bound_mean, function(col) ge
 
 combined_avg_info_avg_bound_mean_info <- bind_rows(lapply(names(avg_info_avg_bound_mean_info), function(name) {
   df <- avg_info_avg_bound_mean_info[[name]]
-  df$step <- as.numeric(name)/20-0.25  # Add a column to track the dataset
+  df$step <- as.numeric(name)/5-1  # Add a column to track the dataset
   return(df)
 }))
 
@@ -133,19 +178,17 @@ gradient_neg <- colorRampPalette(c("darkred", "firebrick", "darkorange", "#e2a76
 gradient_pos <- colorRampPalette(c("#c0d9e8","#7aa9d6", "royalblue", "darkblue"))(floor((num_steps - 1) / 2))
 
 # Combine both gradients and assign gray50 to step 0
-color_palette <- c(setNames(gradient_neg, as.character(seq(-0.25, -0.05, length.out = length(gradient_neg)))),
+color_palette <- c(setNames(gradient_neg, as.character(seq(-1, -0.2, length.out = length(gradient_neg)))),
                    "0" = "#dcdcdc", 
-                   setNames(gradient_pos, as.character(seq(0.05, 0.25, length.out = length(gradient_pos)))))
+                   setNames(gradient_pos, as.character(seq(0.2, 1, length.out = length(gradient_pos)))))
 
 
 pvflat = c(rep(mean(avg_info_avg_bound_mean_pl$`5`),5 ), 2, 6, 11, 20, rep(mean(avg_info_avg_bound_mean_fcl$`5`),5 ))
 flat = gen_p(pvflat, q)
 flat$step = "flat"
 
-combined_avg_info_avg_bound_mean_info_small = combined_avg_info_avg_bound_mean_info[which(as.numeric(as.character(combined_avg_info_avg_bound_mean_info$step))<0 ),]
-
 ggplot() + 
-  geom_line(data = combined_avg_info_avg_bound_mean_info[which(as.numeric(as.character(combined_avg_info_avg_bound_mean_info$step))<=0 ),], aes(x = q, y = total, color = step), linewidth = 1.5) +
+  geom_line(data = combined_avg_info_avg_bound_mean_info, aes(x = q, y = total, color = step), linewidth = 1.5) +
   geom_line(data = flat, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dashed") +
   #geom_line(data = statusquo, aes(x = q, y = total), color = "#D8CFC4", linewidth = 1, linetype = "dashed") +
   xlab("Quantity (k Gallon)") +
@@ -153,7 +196,7 @@ ggplot() +
   labs(color = "Δ E[Prcp]") +
   scale_color_manual(values = color_palette) +  
   guides(color = guide_legend(override.aes = list(size = 6))) + 
-  ggtitle("Total Payment by Δ Mean Percipitation") +
+  ggtitle("Total Payment by Δ Mean Precipitation") +
   big_text
 
 frames <- list()
@@ -169,7 +212,7 @@ for (step_value in unique(combined_avg_info_avg_bound_mean_info$step)) {
     labs(color = "Δ E[Prcp]") +
     scale_color_manual(values = color_palette) +  
     guides(color = guide_legend(override.aes = list(size = 6))) + 
-    ggtitle("Total Payment by Δ Mean Percipitation") +
+    ggtitle("Total Payment by Δ Mean Precipitation") +
     big_text+
     theme(plot.background = element_rect(fill = "white"))  # Set background to white
   
@@ -185,86 +228,6 @@ gif <- image_animate(image_join(frames), fps = 1, delay = 200)  # fps sets frame
 image_write(gif, "pics/avg_info_avg_bound_mean.gif")
 
 
-##### Distribution ########
-
-avg_info_avg_bound_mean_cs_steps = read_csv("cs_detail_results/avg_info_avg_bound_mean_cs_steps.csv")
-colnames(avg_info_avg_bound_mean_cs_steps) = as.character(as.numeric(colnames(avg_info_avg_bound_mean_cs_steps))/20-0.25)
-
-avg_info_avg_bound_mean_cs_steps_rate <-avg_info_avg_bound_mean_cs_steps %>%
-  mutate(across(-`0`, ~ (. - `0`) / abs(`0`), .names = "rate_{.col}"))
-
-rm(avg_info_avg_bound_mean_cs_steps)
-
-demand_2018_using_new_small = read_csv("../demand_2018_using_new_small.csv")
-demand_key <- demand_2018_using_new_small %>% select(bill_ym, prem_id, income, CAP_HH)
-rm(demand_2018_using_new_small)
-
-avg_info_avg_bound_mean_cs_steps_rate  = cbind(avg_info_avg_bound_mean_cs_steps_rate , demand_key)
-
-avg_info_avg_bound_mean_cs_steps_rate$income_strata = case_when(
-  avg_info_avg_bound_mean_cs_steps_rate$income<5000~ "1",
-  avg_info_avg_bound_mean_cs_steps_rate$income>=5000 & avg_info_avg_bound_mean_cs_steps_rate$income<15000~ "2",
-  avg_info_avg_bound_mean_cs_steps_rate$income>=15000 & avg_info_avg_bound_mean_cs_steps_rate$income<30000~ "3",
-  avg_info_avg_bound_mean_cs_steps_rate$income>=30000 & avg_info_avg_bound_mean_cs_steps_rate$income<50000~ "4",
-  avg_info_avg_bound_mean_cs_steps_rate$income>=50000~ "5"
-)
-
-ggplot(avg_info_avg_bound_mean_cs_steps_rate[which(avg_info_avg_bound_mean_cs_steps_rate$income < 100000 & avg_info_avg_bound_mean_cs_steps_rate$income > 1200), ], aes(x = income, fill = as.factor(income_strata))) +
-  geom_histogram(aes(y = ..count..), bins = 1000, alpha = 1) +
-  scale_fill_manual(
-    values = c("lightgreen", "mediumseagreen", "seagreen", "forestgreen", "darkgreen"),  # Distinct colors for each tier
-    #values = c("lightblue", "lightgreen", "orange", "lightcoral", "darkviolet"),  # Distinct colors for each tier
-    name = "Income Tier"
-  ) +
-  #geom_vline(xintercept = 2, linetype = "dashed", color = "red") + 
-  #geom_vline(xintercept = 6, linetype = "dashed", color = "red") +
-  #geom_vline(xintercept = 11, linetype = "dashed", color = "red") + 
-  #geom_vline(xintercept = 20, linetype = "dashed", color = "red") + 
-  labs(title = "Income Histogram by Strata", x = "Quantity (kGal)", y = "Count") +
-  theme_minimal() + big_text + 
-  theme(legend.position = "bottom")  # Move the legend to the bottom
-
-mean_rate_by_prem_id <- avg_info_avg_bound_mean_cs_steps_rate %>%
-  group_by(prem_id) %>%
-  summarise(across(starts_with("rate_"), mean, na.rm = TRUE))
-
-income_id = avg_info_avg_bound_mean_cs_steps_rate %>% select(prem_id, income, CAP_HH, income_strata) %>% distinct()
-
-mean_rate_by_prem_id = merge(mean_rate_by_prem_id, income_id, by.x = "prem_id", by.y = "prem_id", all.x = T)
-
-mean_rate_by_strata <- mean_rate_by_prem_id %>%
-  group_by(income_strata) %>%
-  summarise(across(starts_with("rate_"), mean, na.rm = TRUE))
-
-#mean_rate_by_strata$`rate_0` = 0
-mean_rate_by_strata = data.frame(t(mean_rate_by_strata))
-mean_rate_by_strata<- mean_rate_by_strata %>% slice(-1)
-
-mean_rate_by_strata <- mean_rate_by_strata %>%
-  rownames_to_column(var = "step") %>% 
-  rename_with(~ gsub("rate_", "", .x))  # Remove "rate_" from column names
-
-mean_rate_by_strata$step = as.numeric(gsub("rate_", "",mean_rate_by_strata$step))
-mean_rate_by_strata <- mean_rate_by_strata %>%
-  arrange(step)
-
-mean_rate_by_strata <- mean_rate_by_strata %>%
-  pivot_longer(cols = X1:X5, names_to = "income_strata", values_to = "cs_change_rate")
-
-mean_rate_by_strata$cs_change_rate = as.numeric(mean_rate_by_strata$cs_change_rate)
-mean_rate_by_strata$income_strata = as.factor(mean_rate_by_strata$income_strata)
-
-
-# Plot using ggplot
-ggplot(mean_rate_by_strata , aes(x = step, y = cs_change_rate, color = income_strata)) +
-  geom_line(size = 1) +  # Add lines
-  geom_point(size = 2) + # Optional: Add points
-  labs(title = "Line Plot of Income Strata vs. Step",
-       x = "Step",
-       y = "CS %",
-       color = "Income Strata") +
-  theme_minimal()
-
 ############################################################
 ################## avg_info_avg_bound_var ##############################
 #########################################################
@@ -273,7 +236,7 @@ avg_info_avg_bound_var_info <- lapply(avg_info_avg_bound_var, function(col) gen_
 
 combined_avg_info_avg_bound_var_info <- bind_rows(lapply(names(avg_info_avg_bound_var_info), function(name) {
   df <- avg_info_avg_bound_var_info[[name]]
-  df$step <- as.numeric(name)/5 -1  # Add a column to track the dataset
+  df$step <- as.numeric(name)/2.5 -2  # Add a column to track the dataset
   return(df)
 }))
 
@@ -296,14 +259,14 @@ gradient_pos <- colorRampPalette(c("#c0d9e8","#7aa9d6", "royalblue", "darkblue")
 combined_avg_info_avg_bound_var_info$step <- factor(combined_avg_info_avg_bound_var_info$step)
 
 # Combine both gradients and assign gray50 to step 0
-color_palette <- c(setNames(gradient_neg, as.character(seq(-1, -0.2, length.out = length(gradient_neg)))),
+color_palette <- c(setNames(gradient_neg, as.character(seq(-2, -0.4, length.out = length(gradient_neg)))),
                    "0" = "#dcdcdc", 
-                   setNames(gradient_pos, as.character(seq(0.2, 1, length.out = length(gradient_pos)))))
+                   setNames(gradient_pos, as.character(seq(0.4, 2, length.out = length(gradient_pos)))))
 
-combined_avg_info_avg_bound_var_info_small = combined_avg_info_avg_bound_var_info[as.numeric(as.character(combined_avg_info_avg_bound_var_info$step))<=0,]
+combined_avg_info_avg_bound_var_info_small = combined_avg_info_avg_bound_var_info[abs(as.numeric(as.character(combined_avg_info_avg_bound_var_info$step)))<=1,]
 
 ggplot() + 
-  geom_line(data = combined_avg_info_avg_bound_var_info[as.numeric(as.character(combined_avg_info_avg_bound_var_info$step))>=0,], aes(x = q, y = total, color = step), linewidth = 1.5) +
+  geom_line(data = combined_avg_info_avg_bound_var_info, aes(x = q, y = total, color = step), linewidth = 1.5) +
   geom_line(data = flat, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dashed") +
   #geom_line(data = statusquo, aes(x = q, y = total), color = "#D8CFC4", linewidth = 1, linetype = "dashed") +
   xlab("Quantity (k Gallon)") +
@@ -311,7 +274,7 @@ ggplot() +
   labs(color = "Δ Min & Max[Prcp]") +
   scale_color_manual(values = color_palette) +  
   guides(color = guide_legend(override.aes = list(size = 6))) + 
-  ggtitle("Total Payment by Δ Var Percipitation") +
+  ggtitle("Total Payment by Δ Var Precipitation") +
   big_text
 
 frames <- list()
@@ -327,7 +290,7 @@ for (step_value in unique(combined_avg_info_avg_bound_var_info$step)) {
     labs(color = "Δ Min & Max[Prcp]") +
     scale_color_manual(values = color_palette) +  
     guides(color = guide_legend(override.aes = list(size = 6))) + 
-    ggtitle("Total Payment by Δ Var Percipitation") +
+    ggtitle("Total Payment by Δ Var Precipitation") +
     big_text+
     theme(plot.background = element_rect(fill = "white"))  # Set background to white
   
@@ -345,9 +308,702 @@ image_write(gif, "pics/avg_info_avg_bound_var.gif")
 
 
 
+############################################################
+################## current_info_avg_bound_mean ##############################
+#########################################################
+
+current_info_avg_bound_mean_info <- lapply(current_info_avg_bound_mean, function(col) gen_p(col, q))
+
+combined_current_info_avg_bound_mean_info <- bind_rows(lapply(names(current_info_avg_bound_mean_info), function(name) {
+  df <- current_info_avg_bound_mean_info[[name]]
+  df$step <- as.numeric(name)/20-0.25  # Add a column to track the dataset
+  return(df)
+}))
+
+# Ensure step is a factor for proper animation handling
+combined_current_info_avg_bound_mean_info$step <- factor(combined_current_info_avg_bound_mean_info$step)
+
+# Define color palette: Steps from brown (dry) to blue (wet), plus muted colors for static lines
+num_steps <- length(unique(combined_current_info_avg_bound_mean_info$step)) 
+# Generate a gradient for steps from -1 to 0 (dark red to gray50)
+gradient_neg <- colorRampPalette(c("darkred", "firebrick", "darkorange", "#e2a76d"))(ceiling((num_steps - 1) / 2))
+
+# Generate a gradient for steps from 0 to 1 (gray50 to dark blue)
+gradient_pos <- colorRampPalette(c("#c0d9e8","#7aa9d6", "royalblue", "darkblue"))(floor((num_steps - 1) / 2))
+
+# Combine both gradients and assign gray50 to step 0
+color_palette <- c(setNames(gradient_neg, as.character(seq(-0.25, -0.05, length.out = length(gradient_neg)))),
+                   "0" = "#dcdcdc", 
+                   setNames(gradient_pos, as.character(seq(0.05, 0.25, length.out = length(gradient_pos)))))
+
+
+pvflat = c(rep(mean(c(3.09,5.01,8.54,12.9,14.41)),5 ), 2, 6, 11, 20, rep(mean(c(8.5,10.8,16.5,37,37)),5 ))
+#pvflat = c(rep(mean(current_info_avg_bound_mean_pl$`5`),5 ), 2, 6, 11, 20, rep(mean(current_info_avg_bound_mean_fcl$`5`),5 ))
+flat = gen_p(pvflat, q)
+flat$step = "flat"
+
+ggplot() + 
+  #geom_line(data = combined_current_info_avg_bound_mean_info[which(as.numeric(as.character((combined_current_info_avg_bound_mean_info$step)))>0),]
+            #         , aes(x = q, y = total, color = step, linetype = "zero"), color = "#CFCFCF", linewidth = 1.5) +
+   #         , aes(x = q, y = total, color = step), linewidth = 1.5) +
+  geom_line(data = flat, aes(x = q, y = total, linetype = "linear"), color = "#6e6e6e", linewidth = 1) +
+  geom_line(data = statusquo, aes(x = q, y = total, linetype = "statusquo"), color = "#080808", linewidth = 1) +
+  #geom_line(data = flat, aes(x = q, y = total), color = "#6e6e6e", linewidth = 1, linetype = "dashed") +
+  #geom_line(data = statusquo, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dotdash") +
+  xlab("Quantity (k Gallon)") +
+  ylab("Total Payment ($)") +
+  labs(
+    #color = "Δ E[Prcp] (Inch)", 
+    linetype = NULL) +
+  #scale_color_manual(values = color_palette) +
+  scale_linetype_manual(values = c("zero" = "solid","linear" = "dashed", "statusquo" = "dotdash")) +
+  coord_cartesian(ylim = c(0, 1750)) +
+  guides(color = guide_legend(override.aes = list(size = 6))) + 
+  #ggtitle("Total Payment") +
+  #ggtitle("Total Payment by Δ Mean Precipitation") +
+  big_text
+
+ggplot() + 
+  geom_line(data = combined_current_info_avg_bound_mean_info[which(as.numeric(as.character((combined_current_info_avg_bound_mean_info$step)))>0),]
+   #         , aes(x = q, y = total, color = step, linetype = "zero"), color = "#CFCFCF", linewidth = 1.5) +
+            , aes(x = q, y = total, color = step), linewidth = 1.5) +
+  #geom_line(data = flat, aes(x = q, y = total, linetype = "linear"), color = "#6e6e6e", linewidth = 1) +
+  #geom_line(data = statusquo, aes(x = q, y = total, linetype = "statusquo"), color = "#080808", linewidth = 1) +
+  geom_line(data = flat, aes(x = q, y = total), color = "#6e6e6e", linewidth = 1, linetype = "dashed") +
+  geom_line(data = statusquo, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dotdash") +
+  xlab("Quantity (k Gallon)") +
+  ylab("Total Payment ($)") +
+  labs(
+    #color = "Δ E[Prcp] (Inch)", 
+       linetype = NULL) +
+  scale_color_manual(values = color_palette) +
+  #scale_linetype_manual(values = c("zero" = "solid","linear" = "dashed", "statusquo" = "dotdash")) +
+  coord_cartesian(ylim = c(0, 1750)) +
+  guides(color = guide_legend(override.aes = list(size = 6))) + 
+  #ggtitle("Total Payment") +
+  #ggtitle("Total Payment by Δ Mean Precipitation") +
+  big_text
+
+frames <- list()
+
+weather_zero =combined_current_info_avg_bound_mean_info[combined_current_info_avg_bound_mean_info$step == 0, ]
+
+# Now the loop can proceed without error
+for (step_value in unique(combined_current_info_avg_bound_mean_info$step)) {
+  plot <- ggplot() + 
+    geom_line(data = combined_current_info_avg_bound_mean_info[combined_current_info_avg_bound_mean_info$step == step_value, ], 
+              aes(x = q, y = total, color = step), linewidth = 1.5) +
+    geom_line(data = flat, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dashed") +
+    geom_line(data = weather_zero, aes(x = q, y = total), color = "#b0b0b0", linewidth = 1, linetype = "dashed") +
+    xlab("Quantity (k Gallon)") +
+    ylab("Payment ($)") +
+    labs(color = "Δ E[Prcp]") +
+    scale_color_manual(values = color_palette) +
+    coord_cartesian(ylim = c(0, 1750)) +
+    guides(color = guide_legend(override.aes = list(size = 6))) + 
+    ggtitle("Total Payment by Δ Mean Precipitation") +
+    big_text+
+    theme(plot.background = element_rect(fill = "white"))  # Set background to white
+  
+  temp_image <- tempfile(fileext = ".png")
+  ggsave(temp_image, plot = plot, width = 10, height = 8, dpi = 300)
+  frames[[length(frames) + 1]] <- image_read(temp_image)
+}
+
+# Combine all the images into a GIF
+gif <- image_animate(image_join(frames), fps = 1, delay = 200)  # fps sets frames per second
+
+# Save the GIF to a file
+image_write(gif, "pics/current_info_avg_bound_mean.gif")
 
 
 
+############################################################
+################## current_info_avg_bound_var ##############################
+#########################################################
+
+current_info_avg_bound_var_info <- lapply(current_info_avg_bound_var, function(col) gen_p(col, q))
+
+combined_current_info_avg_bound_var_info <- bind_rows(lapply(names(current_info_avg_bound_var_info), function(name) {
+  df <- current_info_avg_bound_var_info[[name]]
+  df$step <- as.numeric(name)/20 +0.75  # Add a column to track the dataset
+  return(df)
+}))
+
+# Ensure step is a factor for proper animation handling
+combined_current_info_avg_bound_var_info$step <- factor(combined_current_info_avg_bound_var_info$step)
+
+# Define color palette: Steps from brown (dry) to blue (wet), plus muted colors for static lines
+num_steps <- length(unique(combined_current_info_avg_bound_var_info$step)) 
+# Generate a gradient for steps from -1 to 0 (dark red to gray50)
+gradient_neg <- colorRampPalette(c("darkred", "firebrick", "darkorange", "#e2a76d"))(ceiling((num_steps - 1) / 2))
+
+# Generate a gradient for steps from 0 to 1 (gray50 to dark blue)
+gradient_pos <- colorRampPalette(c("#c0d9e8","#7aa9d6", "royalblue", "darkblue"))(floor((num_steps - 1) / 2))
+
+# Ensure step is a factor for proper animation handling
+combined_current_info_avg_bound_var_info$step <- factor(combined_current_info_avg_bound_var_info$step)
+
+# Combine both gradients and assign gray50 to step 0
+color_palette <- c(setNames(gradient_neg, as.character(seq(0.75, 0.95, length.out = length(gradient_neg)))),
+                   "1" = "#dcdcdc", 
+                   setNames(gradient_pos, as.character(seq(1.05, 1.25, length.out = length(gradient_pos)))))
+
+pvflat = c(rep(mean(c(3.09,5.01,8.54,12.9,14.41)),5 ), 2, 6, 11, 20, rep(mean(c(8.5,10.8,16.5,37,37)),5 ))
+#pvflat = c(rep(mean(current_info_avg_bound_mean_pl$`5`),5 ), 2, 6, 11, 20, rep(mean(current_info_avg_bound_mean_fcl$`5`),5 ))
+flat = gen_p(pvflat, q)
+flat$step = "flat"
+
+ggplot() + 
+  geom_line(data = combined_current_info_avg_bound_var_info[which(as.numeric(as.character((combined_current_info_avg_bound_var_info$step)))>1),]
+            , aes(x = q, y = total, color = step), linewidth = 1.5) +
+  geom_line(data = flat, aes(x = q, y = total), color = "#6e6e6e", linewidth = 1, linetype = "dashed") +
+  geom_line(data = statusquo, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dotdash") +
+  xlab("Quantity (k Gallon)") +
+  ylab("Payment ($)") +
+  labs(color = "SD Ratio") +
+  scale_color_manual(values = color_palette) +
+  coord_cartesian(ylim = c(0, 1750)) +
+  guides(color = guide_legend(override.aes = list(size = 6))) + 
+  #ggtitle("Total Payment by Δ Var Precipitation") +
+  big_text
+
+frames <- list()
+
+weather_zero =combined_current_info_avg_bound_var_info[combined_current_info_avg_bound_var_info$step == 0, ]
+
+# Now the loop can proceed without error
+for (step_value in unique(combined_current_info_avg_bound_var_info$step)) {
+  plot <- ggplot() + 
+    geom_line(data = combined_current_info_avg_bound_var_info[combined_current_info_avg_bound_var_info$step == step_value, ], 
+              aes(x = q, y = total, color = step), linewidth = 1.5) +
+    geom_line(data = flat, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dashed") +
+    geom_line(data = weather_zero, aes(x = q, y = total), color = "#b0b0b0", linewidth = 1, linetype = "dashed") +
+    xlab("Quantity (k Gallon)") +
+    ylab("Payment ($)") +
+    labs(color = "Δ Min & Max[Prcp]") +
+    scale_color_manual(values = color_palette) +  
+    guides(color = guide_legend(override.aes = list(size = 6))) + 
+    ggtitle("Total Payment by Δ Var Precipitation") +
+    coord_cartesian(ylim = c(0, 1750)) +
+    big_text+
+    theme(plot.background = element_rect(fill = "white"))  # Set background to white
+  
+  temp_image <- tempfile(fileext = ".png")
+  ggsave(temp_image, plot = plot, width = 10, height = 8, dpi = 300)
+  frames[[length(frames) + 1]] <- image_read(temp_image)
+}
+
+# Combine all the images into a GIF
+gif <- image_animate(image_join(frames), fps = 1, delay = 200)  # fps sets frames per second
+
+# Save the GIF to a file
+image_write(gif, "pics/current_info_avg_bound_var.gif")
+
+
+############################################################
+################## current_info_extreme_bound_mean ##############################
+#########################################################
+
+current_info_extreme_bound_mean_info <- lapply(current_info_extreme_bound_mean, function(col) gen_p(col, q))
+
+combined_current_info_extreme_bound_mean_info <- bind_rows(lapply(names(current_info_extreme_bound_mean_info), function(name) {
+  df <- current_info_extreme_bound_mean_info[[name]]
+  df$step <- as.numeric(name)/20-0.25  # Add a column to track the dataset
+  return(df)
+}))
+
+# Ensure step is a factor for proper animation handling
+combined_current_info_extreme_bound_mean_info$step <- factor(combined_current_info_extreme_bound_mean_info$step)
+
+# Define color palette: Steps from brown (dry) to blue (wet), plus muted colors for static lines
+num_steps <- length(unique(combined_current_info_extreme_bound_mean_info$step)) 
+# Generate a gradient for steps from -1 to 0 (dark red to gray50)
+gradient_neg <- colorRampPalette(c("darkred", "firebrick", "darkorange", "#e2a76d"))(ceiling((num_steps - 1) / 2))
+
+# Generate a gradient for steps from 0 to 1 (gray50 to dark blue)
+gradient_pos <- colorRampPalette(c("#c0d9e8","#7aa9d6", "royalblue", "darkblue"))(floor((num_steps - 1) / 2))
+
+# Combine both gradients and assign gray50 to step 0
+color_palette <- c(setNames(gradient_neg, as.character(seq(-0.25, -0.05, length.out = length(gradient_neg)))),
+                   "0" = "#dcdcdc", 
+                   setNames(gradient_pos, as.character(seq(0.05, 0.25, length.out = length(gradient_pos)))))
+
+
+pvflat = c(rep(mean(current_info_extreme_bound_mean_pl$`5`),5 ), 2, 6, 11, 20, rep(mean(current_info_extreme_bound_mean_fcl$`5`),5 ))
+flat = gen_p(pvflat, q)
+flat$step = "flat"
+
+ggplot() + 
+  geom_line(data = combined_current_info_extreme_bound_mean_info[which(as.numeric(as.character((combined_current_info_avg_bound_mean_info$step)))>=0),]
+            , aes(x = q, y = total, color = step), linewidth = 1.5) +
+  #geom_line(data = flat, aes(x = q, y = total, linetype = "linear"), color = "#6e6e6e", linewidth = 1) +
+  #geom_line(data = statusquo, aes(x = q, y = total, linetype = "statusquo"), color = "#080808", linewidth = 1) +
+  geom_line(data = flat, aes(x = q, y = total), color = "#6e6e6e", linewidth = 1, linetype = "dashed") +
+  geom_line(data = statusquo, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dotdash") +
+  xlab("Quantity (k Gallon)") +
+  ylab("Total Payment ($)") +
+  labs(color = "Δ E[Prcp] (Inch)", linetype = NULL) +
+  scale_color_manual(values = color_palette) +
+  #scale_linetype_manual(values = c("linear" = "dashed", "statusquo" = "dotdash")) +
+  coord_cartesian(ylim = c(0, 10500)) +
+  guides(color = guide_legend(override.aes = list(size = 6))) + 
+  #ggtitle("Total Payment") +
+  #ggtitle("Total Payment by Δ Mean Precipitation") +
+  big_text
+
+frames <- list()
+
+weather_zero =combined_current_info_extreme_bound_mean_info[combined_current_info_extreme_bound_mean_info$step == 0, ]
+
+# Now the loop can proceed without error
+for (step_value in unique(combined_current_info_extreme_bound_mean_info$step)) {
+  plot <- ggplot() + 
+    geom_line(data = combined_current_info_extreme_bound_mean_info[combined_current_info_extreme_bound_mean_info$step == step_value, ], 
+              aes(x = q, y = total, color = step), linewidth = 1.5) +
+    geom_line(data = flat, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dashed") +
+    geom_line(data = weather_zero, aes(x = q, y = total), color = "#b0b0b0", linewidth = 1, linetype = "dashed") +
+    xlab("Quantity (k Gallon)") +
+    ylab("Payment ($)") +
+    labs(color = "Δ E[Prcp]") +
+    scale_color_manual(values = color_palette) +
+    coord_cartesian(ylim = c(0, 1750)) +
+    guides(color = guide_legend(override.aes = list(size = 6))) + 
+    ggtitle("Total Payment by Δ Mean Precipitation") +
+    big_text+
+    theme(plot.background = element_rect(fill = "white"))  # Set background to white
+  
+  temp_image <- tempfile(fileext = ".png")
+  ggsave(temp_image, plot = plot, width = 10, height = 8, dpi = 300)
+  frames[[length(frames) + 1]] <- image_read(temp_image)
+}
+
+# Combine all the images into a GIF
+gif <- image_animate(image_join(frames), fps = 1, delay = 200)  # fps sets frames per second
+
+# Save the GIF to a file
+image_write(gif, "pics/current_info_extreme_bound_mean.gif")
+
+
+
+############################################################
+################## current_info_extreme_bound_var ##############################
+#########################################################
+
+current_info_extreme_bound_var_info <- lapply(current_info_extreme_bound_var, function(col) gen_p(col, q))
+
+combined_current_info_extreme_bound_var_info <- bind_rows(lapply(names(current_info_extreme_bound_var_info), function(name) {
+  df <- current_info_extreme_bound_var_info[[name]]
+  df$step <- as.numeric(name)/20 +0.75  # Add a column to track the dataset
+  return(df)
+}))
+
+# Ensure step is a factor for proper animation handling
+combined_current_info_extreme_bound_var_info$step <- factor(combined_current_info_extreme_bound_var_info$step)
+
+# Define color palette: Steps from brown (dry) to blue (wet), plus muted colors for static lines
+num_steps <- length(unique(combined_current_info_extreme_bound_var_info$step)) 
+# Generate a gradient for steps from -1 to 0 (dark red to gray50)
+gradient_neg <- colorRampPalette(c("darkred", "firebrick", "darkorange", "#e2a76d"))(ceiling((num_steps - 1) / 2))
+
+# Generate a gradient for steps from 0 to 1 (gray50 to dark blue)
+gradient_pos <- colorRampPalette(c("#c0d9e8","#7aa9d6", "royalblue", "darkblue"))(floor((num_steps - 1) / 2))
+
+# Ensure step is a factor for proper animation handling
+combined_current_info_extreme_bound_var_info$step <- factor(combined_current_info_extreme_bound_var_info$step)
+
+# Combine both gradients and assign gray50 to step 0
+color_palette <- c(setNames(gradient_neg, as.character(seq(0.75, 0.95, length.out = length(gradient_neg)))),
+                   "1" = "#dcdcdc", 
+                   setNames(gradient_pos, as.character(seq(1.05, 1.25, length.out = length(gradient_pos)))))
+
+combined_current_info_extreme_bound_var_info_small = combined_current_info_extreme_bound_var_info[abs(as.numeric(as.character(combined_current_info_extreme_bound_var_info$step)))<=1,]
+
+ggplot() + 
+  geom_line(data = combined_current_info_extreme_bound_var_info[which(as.numeric(as.character((combined_current_info_extreme_bound_var_info$step)))>=1),]
+            , aes(x = q, y = total, color = step), linewidth = 1.5) +
+  geom_line(data = flat, aes(x = q, y = total), color = "#6e6e6e", linewidth = 1, linetype = "dashed") +
+  geom_line(data = statusquo, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dotdash") +
+  xlab("Quantity (k Gallon)") +
+  ylab("Payment ($)") +
+  labs(color = "SD Ratio") +
+  scale_color_manual(values = color_palette) +
+  coord_cartesian(ylim = c(0, 10500)) +
+  guides(color = guide_legend(override.aes = list(size = 6))) + 
+  #ggtitle("Total Payment by Δ Var Precipitation") +
+  big_text
+
+frames <- list()
+
+weather_zero =combined_current_info_extreme_bound_var_info[combined_current_info_extreme_bound_var_info$step == 0, ]
+
+# Now the loop can proceed without error
+for (step_value in unique(combined_current_info_extreme_bound_var_info$step)) {
+  plot <- ggplot() + 
+    geom_line(data = combined_current_info_extreme_bound_var_info[combined_current_info_extreme_bound_var_info$step == step_value, ], 
+              aes(x = q, y = total, color = step), linewidth = 1.5) +
+    geom_line(data = flat, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dashed") +
+    geom_line(data = weather_zero, aes(x = q, y = total), color = "#b0b0b0", linewidth = 1, linetype = "dashed") +
+    xlab("Quantity (k Gallon)") +
+    ylab("Payment ($)") +
+    labs(color = "Δ Min & Max[Prcp]") +
+    scale_color_manual(values = color_palette) +  
+    guides(color = guide_legend(override.aes = list(size = 6))) + 
+    ggtitle("Total Payment by Δ Var Precipitation") +
+    coord_cartesian(ylim = c(0, 1750)) +
+    big_text+
+    theme(plot.background = element_rect(fill = "white"))  # Set background to white
+  
+  temp_image <- tempfile(fileext = ".png")
+  ggsave(temp_image, plot = plot, width = 10, height = 8, dpi = 300)
+  frames[[length(frames) + 1]] <- image_read(temp_image)
+}
+
+# Combine all the images into a GIF
+gif <- image_animate(image_join(frames), fps = 1, delay = 200)  # fps sets frames per second
+
+# Save the GIF to a file
+image_write(gif, "pics/current_info_extreme_bound_var.gif")
+
+############################################################
+################## current_info_logr_bound_mean ##############################
+#########################################################
+
+current_info_logr_bound_mean_info <- lapply(current_info_logr_bound_mean, function(col) gen_p(col, q))
+
+combined_current_info_logr_bound_mean_info <- bind_rows(lapply(names(current_info_logr_bound_mean_info), function(name) {
+  df <- current_info_logr_bound_mean_info[[name]]
+  df$step <- as.numeric(name)/20-0.25  # Add a column to track the dataset
+  return(df)
+}))
+
+# Ensure step is a factor for proper animation handling
+combined_current_info_logr_bound_mean_info$step <- factor(combined_current_info_logr_bound_mean_info$step)
+
+# Define color palette: Steps from brown (dry) to blue (wet), plus muted colors for static lines
+num_steps <- length(unique(combined_current_info_logr_bound_mean_info$step)) 
+# Generate a gradient for steps from -1 to 0 (dark red to gray50)
+gradient_neg <- colorRampPalette(c("darkred", "firebrick", "darkorange", "#e2a76d"))(ceiling((num_steps - 1) / 2))
+
+# Generate a gradient for steps from 0 to 1 (gray50 to dark blue)
+gradient_pos <- colorRampPalette(c("#c0d9e8","#7aa9d6", "royalblue", "darkblue"))(floor((num_steps - 1) / 2))
+
+# Combine both gradients and assign gray50 to step 0
+color_palette <- c(setNames(gradient_neg, as.character(seq(-0.25, -0.05, length.out = length(gradient_neg)))),
+                   "0" = "#dcdcdc", 
+                   setNames(gradient_pos, as.character(seq(0.05, 0.25, length.out = length(gradient_pos)))))
+
+
+pvflat = c(rep(mean(c(3.09,5.01,8.54,12.9,14.41)),5 ), 2, 6, 11, 20, rep(mean(c(8.5,10.8,16.5,37,37)),5 ))
+#pvflat = c(rep(mean(current_info_avg_bound_mean_pl$`5`),5 ), 2, 6, 11, 20, rep(mean(current_info_avg_bound_mean_fcl$`5`),5 ))
+flat = gen_p(pvflat, q)
+flat$step = "flat"
+
+ggplot() + 
+  geom_line(data = combined_current_info_logr_bound_mean_info[which(as.numeric(as.character((combined_current_info_logr_bound_mean_info$step)))<0),]
+            , aes(x = q, y = total, color = step), linewidth = 1.5) +
+  #geom_line(data = flat, aes(x = q, y = total, linetype = "linear"), color = "#6e6e6e", linewidth = 1) +
+  #geom_line(data = statusquo, aes(x = q, y = total, linetype = "statusquo"), color = "#080808", linewidth = 1) +
+  geom_line(data = flat, aes(x = q, y = total), color = "#6e6e6e", linewidth = 1, linetype = "dashed") +
+  geom_line(data = statusquo, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dotdash") +
+  xlab("Quantity (k Gallon)") +
+  ylab("Total Payment ($)") +
+  labs(color = "Δ E[Prcp] (Inch)", linetype = NULL) +
+  scale_color_manual(values = color_palette) +
+  #scale_linetype_manual(values = c("linear" = "dashed", "statusquo" = "dotdash")) +
+  coord_cartesian(ylim = c(0, 2500)) +
+  guides(color = guide_legend(override.aes = list(size = 6))) + 
+  #ggtitle("Total Payment") +
+  #ggtitle("Total Payment by Δ Mean Precipitation") +
+  big_text
+
+frames <- list()
+
+weather_zero =combined_current_info_logr_bound_mean_info[combined_current_info_logr_bound_mean_info$step == 0, ]
+
+# Now the loop can proceed without error
+for (step_value in unique(combined_current_info_logr_bound_mean_info$step)) {
+  plot <- ggplot() + 
+    geom_line(data = combined_current_info_logr_bound_mean_info[combined_current_info_logr_bound_mean_info$step == step_value, ], 
+              aes(x = q, y = total, color = step), linewidth = 1.5) +
+    geom_line(data = flat, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dashed") +
+    geom_line(data = weather_zero, aes(x = q, y = total), color = "#b0b0b0", linewidth = 1, linetype = "dashed") +
+    xlab("Quantity (k Gallon)") +
+    ylab("Payment ($)") +
+    labs(color = "Δ E[Prcp]") +
+    scale_color_manual(values = color_palette) +
+    coord_cartesian(ylim = c(0, 1750)) +
+    guides(color = guide_legend(override.aes = list(size = 6))) + 
+    ggtitle("Total Payment by Δ Mean Precipitation") +
+    big_text+
+    theme(plot.background = element_rect(fill = "white"))  # Set background to white
+  
+  temp_image <- tempfile(fileext = ".png")
+  ggsave(temp_image, plot = plot, width = 10, height = 8, dpi = 300)
+  frames[[length(frames) + 1]] <- image_read(temp_image)
+}
+
+# Combine all the images into a GIF
+gif <- image_animate(image_join(frames), fps = 1, delay = 200)  # fps sets frames per second
+
+# Save the GIF to a file
+image_write(gif, "pics/current_info_logr_bound_mean.gif")
+
+
+
+############################################################
+################## current_info_logr_bound_var ##############################
+#########################################################
+
+current_info_logr_bound_var_info <- lapply(current_info_logr_bound_var, function(col) gen_p(col, q))
+
+combined_current_info_logr_bound_var_info <- bind_rows(lapply(names(current_info_logr_bound_var_info), function(name) {
+  df <- current_info_logr_bound_var_info[[name]]
+  df$step <- as.numeric(name)/20 +0.75  # Add a column to track the dataset
+  return(df)
+}))
+
+# Ensure step is a factor for proper animation handling
+combined_current_info_logr_bound_var_info$step <- factor(combined_current_info_logr_bound_var_info$step)
+
+# Define color palette: Steps from brown (dry) to blue (wet), plus muted colors for static lines
+num_steps <- length(unique(combined_current_info_logr_bound_var_info$step)) 
+# Generate a gradient for steps from -1 to 0 (dark red to gray50)
+gradient_neg <- colorRampPalette(c("darkred", "firebrick", "darkorange", "#e2a76d"))(ceiling((num_steps - 1) / 2))
+
+# Generate a gradient for steps from 0 to 1 (gray50 to dark blue)
+gradient_pos <- colorRampPalette(c("#c0d9e8","#7aa9d6", "royalblue", "darkblue"))(floor((num_steps - 1) / 2))
+
+# Ensure step is a factor for proper animation handling
+combined_current_info_logr_bound_var_info$step <- factor(combined_current_info_logr_bound_var_info$step)
+
+# Combine both gradients and assign gray50 to step 0
+color_palette <- c(setNames(gradient_neg, as.character(seq(0.75, 0.95, length.out = length(gradient_neg)))),
+                   "1" = "#dcdcdc", 
+                   setNames(gradient_pos, as.character(seq(1.05, 1.25, length.out = length(gradient_pos)))))
+
+combined_current_info_logr_bound_var_info_small = combined_current_info_logr_bound_var_info[abs(as.numeric(as.character(combined_current_info_logr_bound_var_info$step)))<=1,]
+
+pvflat = c(rep(mean(c(3.09,5.01,8.54,12.9,14.41)),5 ), 2, 6, 11, 20, rep(mean(c(8.5,10.8,16.5,37,37)),5 ))
+#pvflat = c(rep(mean(current_info_avg_bound_mean_pl$`5`),5 ), 2, 6, 11, 20, rep(mean(current_info_avg_bound_mean_fcl$`5`),5 ))
+flat = gen_p(pvflat, q)
+flat$step = "flat"
+
+ggplot() + 
+  geom_line(data = combined_current_info_logr_bound_var_info[which(as.numeric(as.character((combined_current_info_logr_bound_var_info$step)))>1),]
+            , aes(x = q, y = total, color = step), linewidth = 1.5) +
+  geom_line(data = flat, aes(x = q, y = total), color = "#6e6e6e", linewidth = 1, linetype = "dashed") +
+  geom_line(data = statusquo, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dotdash") +
+  xlab("Quantity (k Gallon)") +
+  ylab("Payment ($)") +
+  labs(color = "SD Ratio") +
+  scale_color_manual(values = color_palette) +
+  coord_cartesian(ylim = c(0, 2500)) +
+  guides(color = guide_legend(override.aes = list(size = 6))) + 
+  #ggtitle("Total Payment by Δ Var Precipitation") +
+  big_text
+
+frames <- list()
+
+weather_zero =combined_current_info_logr_bound_var_info[combined_current_info_logr_bound_var_info$step == 0, ]
+
+# Now the loop can proceed without error
+for (step_value in unique(combined_current_info_logr_bound_var_info$step)) {
+  plot <- ggplot() + 
+    geom_line(data = combined_current_info_logr_bound_var_info[combined_current_info_logr_bound_var_info$step == step_value, ], 
+              aes(x = q, y = total, color = step), linewidth = 1.5) +
+    geom_line(data = flat, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dashed") +
+    geom_line(data = weather_zero, aes(x = q, y = total), color = "#b0b0b0", linewidth = 1, linetype = "dashed") +
+    xlab("Quantity (k Gallon)") +
+    ylab("Payment ($)") +
+    labs(color = "Δ Min & Max[Prcp]") +
+    scale_color_manual(values = color_palette) +  
+    guides(color = guide_legend(override.aes = list(size = 6))) + 
+    ggtitle("Total Payment by Δ Var Precipitation") +
+    coord_cartesian(ylim = c(0, 1750)) +
+    big_text+
+    theme(plot.background = element_rect(fill = "white"))  # Set background to white
+  
+  temp_image <- tempfile(fileext = ".png")
+  ggsave(temp_image, plot = plot, width = 10, height = 8, dpi = 300)
+  frames[[length(frames) + 1]] <- image_read(temp_image)
+}
+
+# Combine all the images into a GIF
+gif <- image_animate(image_join(frames), fps = 1, delay = 200)  # fps sets frames per second
+
+# Save the GIF to a file
+image_write(gif, "pics/current_info_logr_bound_var.gif")
+
+############################################################
+################## current_info_gamma05_bound_mean ##############################
+#########################################################
+
+current_info_gamma05_bound_mean_info <- lapply(current_info_gamma05_bound_mean, function(col) gen_p(col, q))
+
+combined_current_info_gamma05_bound_mean_info <- bind_rows(lapply(names(current_info_gamma05_bound_mean_info), function(name) {
+  df <- current_info_gamma05_bound_mean_info[[name]]
+  df$step <- as.numeric(name)/20-0.25  # Add a column to track the dataset
+  return(df)
+}))
+
+# Ensure step is a factor for proper animation handling
+combined_current_info_gamma05_bound_mean_info$step <- factor(combined_current_info_gamma05_bound_mean_info$step)
+
+# Define color palette: Steps from brown (dry) to blue (wet), plus muted colors for static lines
+num_steps <- length(unique(combined_current_info_gamma05_bound_mean_info$step)) 
+# Generate a gradient for steps from -1 to 0 (dark red to gray50)
+gradient_neg <- colorRampPalette(c("darkred", "firebrick", "darkorange", "#e2a76d"))(ceiling((num_steps - 1) / 2))
+
+# Generate a gradient for steps from 0 to 1 (gray50 to dark blue)
+gradient_pos <- colorRampPalette(c("#c0d9e8","#7aa9d6", "royalblue", "darkblue"))(floor((num_steps - 1) / 2))
+
+# Combine both gradients and assign gray50 to step 0
+color_palette <- c(setNames(gradient_neg, as.character(seq(-0.25, -0.05, length.out = length(gradient_neg)))),
+                   "0" = "#dcdcdc", 
+                   setNames(gradient_pos, as.character(seq(0.05, 0.25, length.out = length(gradient_pos)))))
+
+
+pvflat = c(rep(mean(c(3.09,5.01,8.54,12.9,14.41)),5 ), 2, 6, 11, 20, rep(mean(c(8.5,10.8,16.5,37,37)),5 ))
+#pvflat = c(rep(mean(current_info_avg_bound_mean_pl$`5`),5 ), 2, 6, 11, 20, rep(mean(current_info_avg_bound_mean_fcl$`5`),5 ))
+flat = gen_p(pvflat, q)
+flat$step = "flat"
+
+ggplot() + 
+  geom_line(data = combined_current_info_gamma05_bound_mean_info[which(as.numeric(as.character((combined_current_info_gamma05_bound_mean_info$step)))>0),]
+            , aes(x = q, y = total, color = step), linewidth = 1.5) +
+  #geom_line(data = flat, aes(x = q, y = total, linetype = "linear"), color = "#6e6e6e", linewidth = 1) +
+  #geom_line(data = statusquo, aes(x = q, y = total, linetype = "statusquo"), color = "#080808", linewidth = 1) +
+  geom_line(data = flat, aes(x = q, y = total), color = "#6e6e6e", linewidth = 1, linetype = "dashed") +
+  geom_line(data = statusquo, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dotdash") +
+  xlab("Quantity (k Gallon)") +
+  ylab("Total Payment ($)") +
+  labs(color = "Δ E[Prcp] (Inch)", linetype = NULL) +
+  scale_color_manual(values = color_palette) +
+  #scale_linetype_manual(values = c("linear" = "dashed", "statusquo" = "dotdash")) +
+  coord_cartesian(ylim = c(0, 2500)) +
+  guides(color = guide_legend(override.aes = list(size = 6))) + 
+  #ggtitle("Total Payment") +
+  #ggtitle("Total Payment by Δ Mean Precipitation") +
+  big_text
+
+frames <- list()
+
+weather_zero =combined_current_info_gamma05_bound_mean_info[combined_current_info_gamma05_bound_mean_info$step == 0, ]
+
+# Now the loop can proceed without error
+for (step_value in unique(combined_current_info_gamma05_bound_mean_info$step)) {
+  plot <- ggplot() + 
+    geom_line(data = combined_current_info_gamma05_bound_mean_info[combined_current_info_gamma05_bound_mean_info$step == step_value, ], 
+              aes(x = q, y = total, color = step), linewidth = 1.5) +
+    geom_line(data = flat, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dashed") +
+    geom_line(data = weather_zero, aes(x = q, y = total), color = "#b0b0b0", linewidth = 1, linetype = "dashed") +
+    xlab("Quantity (k Gallon)") +
+    ylab("Payment ($)") +
+    labs(color = "Δ E[Prcp]") +
+    scale_color_manual(values = color_palette) +
+    coord_cartesian(ylim = c(0, 1750)) +
+    guides(color = guide_legend(override.aes = list(size = 6))) + 
+    ggtitle("Total Payment by Δ Mean Precipitation") +
+    big_text+
+    theme(plot.background = element_rect(fill = "white"))  # Set background to white
+  
+  temp_image <- tempfile(fileext = ".png")
+  ggsave(temp_image, plot = plot, width = 10, height = 8, dpi = 300)
+  frames[[length(frames) + 1]] <- image_read(temp_image)
+}
+
+# Combine all the images into a GIF
+gif <- image_animate(image_join(frames), fps = 1, delay = 200)  # fps sets frames per second
+
+# Save the GIF to a file
+image_write(gif, "pics/current_info_gamma05_bound_mean.gif")
+
+
+
+############################################################
+################## current_info_gamma05_bound_var ##############################
+#########################################################
+
+current_info_gamma05_bound_var_info <- lapply(current_info_gamma05_bound_var, function(col) gen_p(col, q))
+
+combined_current_info_gamma05_bound_var_info <- bind_rows(lapply(names(current_info_gamma05_bound_var_info), function(name) {
+  df <- current_info_gamma05_bound_var_info[[name]]
+  df$step <- as.numeric(name)/20 +0.75  # Add a column to track the dataset
+  return(df)
+}))
+
+# Ensure step is a factor for proper animation handling
+combined_current_info_gamma05_bound_var_info$step <- factor(combined_current_info_gamma05_bound_var_info$step)
+
+# Define color palette: Steps from brown (dry) to blue (wet), plus muted colors for static lines
+num_steps <- length(unique(combined_current_info_gamma05_bound_var_info$step)) 
+# Generate a gradient for steps from -1 to 0 (dark red to gray50)
+gradient_neg <- colorRampPalette(c("darkred", "firebrick", "darkorange", "#e2a76d"))(ceiling((num_steps - 1) / 2))
+
+# Generate a gradient for steps from 0 to 1 (gray50 to dark blue)
+gradient_pos <- colorRampPalette(c("#c0d9e8","#7aa9d6", "royalblue", "darkblue"))(floor((num_steps - 1) / 2))
+
+# Ensure step is a factor for proper animation handling
+combined_current_info_gamma05_bound_var_info$step <- factor(combined_current_info_gamma05_bound_var_info$step)
+
+# Combine both gradients and assign gray50 to step 0
+color_palette <- c(setNames(gradient_neg, as.character(seq(0.75, 0.95, length.out = length(gradient_neg)))),
+                   "1" = "#dcdcdc", 
+                   setNames(gradient_pos, as.character(seq(1.05, 1.25, length.out = length(gradient_pos)))))
+
+combined_current_info_gamma05_bound_var_info_small = combined_current_info_gamma05_bound_var_info[abs(as.numeric(as.character(combined_current_info_gamma05_bound_var_info$step)))<=1,]
+
+pvflat = c(rep(mean(c(3.09,5.01,8.54,12.9,14.41)),5 ), 2, 6, 11, 20, rep(mean(c(8.5,10.8,16.5,37,37)),5 ))
+#pvflat = c(rep(mean(current_info_avg_bound_mean_pl$`5`),5 ), 2, 6, 11, 20, rep(mean(current_info_avg_bound_mean_fcl$`5`),5 ))
+flat = gen_p(pvflat, q)
+flat$step = "flat"
+
+ggplot() + 
+  geom_line(data = combined_current_info_gamma05_bound_var_info[which(as.numeric(as.character((combined_current_info_gamma05_bound_var_info$step)))>1),]
+            , aes(x = q, y = total, color = step), linewidth = 1.5) +
+  geom_line(data = flat, aes(x = q, y = total), color = "#6e6e6e", linewidth = 1, linetype = "dashed") +
+  geom_line(data = statusquo, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dotdash") +
+  xlab("Quantity (k Gallon)") +
+  ylab("Payment ($)") +
+  labs(color = "SD Ratio") +
+  scale_color_manual(values = color_palette) +
+  coord_cartesian(ylim = c(0, 2000)) +
+  guides(color = guide_legend(override.aes = list(size = 6))) + 
+  #ggtitle("Total Payment by Δ Var Precipitation") +
+  big_text
+
+frames <- list()
+
+weather_zero =combined_current_info_gamma05_bound_var_info[combined_current_info_gamma05_bound_var_info$step == 0, ]
+
+# Now the loop can proceed without error
+for (step_value in unique(combined_current_info_gamma05_bound_var_info$step)) {
+  plot <- ggplot() + 
+    geom_line(data = combined_current_info_gamma05_bound_var_info[combined_current_info_gamma05_bound_var_info$step == step_value, ], 
+              aes(x = q, y = total, color = step), linewidth = 1.5) +
+    geom_line(data = flat, aes(x = q, y = total), color = "#080808", linewidth = 1, linetype = "dashed") +
+    geom_line(data = weather_zero, aes(x = q, y = total), color = "#b0b0b0", linewidth = 1, linetype = "dashed") +
+    xlab("Quantity (k Gallon)") +
+    ylab("Payment ($)") +
+    labs(color = "Δ Min & Max[Prcp]") +
+    scale_color_manual(values = color_palette) +  
+    guides(color = guide_legend(override.aes = list(size = 6))) + 
+    ggtitle("Total Payment by Δ Var Precipitation") +
+    coord_cartesian(ylim = c(0, 1750)) +
+    big_text+
+    theme(plot.background = element_rect(fill = "white"))  # Set background to white
+  
+  temp_image <- tempfile(fileext = ".png")
+  ggsave(temp_image, plot = plot, width = 10, height = 8, dpi = 300)
+  frames[[length(frames) + 1]] <- image_read(temp_image)
+}
+
+# Combine all the images into a GIF
+gif <- image_animate(image_join(frames), fps = 1, delay = 200)  # fps sets frames per second
+
+# Save the GIF to a file
+image_write(gif, "pics/current_info_gamma05_bound_var.gif")
 
 #####
 mp1 = ggplot() + 
@@ -601,7 +1257,7 @@ ggplot(data = avg_info_avg_bound_welfare) +
   geom_line(aes(x = steps, y = mean_cs_diff, color = "cs"), linetype = "longdash", linewidth = 2)+
   geom_line(aes(x = steps, y = mean_q_diff, color = "q"), linetype = "solid", linewidth = 2)+
   scale_color_manual(
-    values = c("r" = "#5f9f5a", "cs" = "#ad486c", "q" = "#3e8e9d"),
+    values = c("r" = "#316387", "cs" = "#842411", "q" = "#256b33"),
     labels = c("r" = "PS", "cs" = "CS", "q" = "Q")
   ) +
   coord_cartesian(xlim = c(min(range(avg_info_avg_bound_welfare$steps))
@@ -614,8 +1270,8 @@ ggplot(data = avg_info_avg_bound_welfare) +
     x = NULL,
     y = NULL
   ) +
-  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
-  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", linewidth = 1.2) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 1.2) +
   big_text +
   theme(
     legend.position = "bottom",
@@ -629,7 +1285,7 @@ ggplot(data = avg_info_avg_bound_welfare) +
   geom_line(aes(x = s_steps, y = var_cs_diff, color = "cs"), linetype = "longdash", linewidth = 2)+
   geom_line(aes(x = s_steps, y = var_q_diff, color = "q"), linetype = "solid", linewidth = 2)+
   scale_color_manual(
-    values = c("r" = "#5f9f5a", "cs" = "#ad486c", "q" = "#3e8e9d"),
+    values = c("r" = "#316387", "cs" = "#842411", "q" = "#256b33"),
     labels = c("r" = "PS", "cs" = "CS", "q" = "Q")
   ) +
   coord_cartesian(xlim = c(min(range(avg_info_avg_bound_welfare$s_steps))
@@ -642,6 +1298,70 @@ ggplot(data = avg_info_avg_bound_welfare) +
     x = NULL,
     y = NULL
   ) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", linewidth = 1.2) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 1.2) +
+  big_text +
+  theme(
+    legend.position = "bottom",
+    legend.key.width = unit(2, "cm"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+
+##### current_info_avg_bound ####
+
+current_info_avg_bound_mean_cs = read_csv("current_info_avg_bound_mean_cs.csv")
+current_info_avg_bound_mean_q = read_csv("current_info_avg_bound_mean_q.csv")
+current_info_avg_bound_mean_r = read_csv("current_info_avg_bound_mean_r.csv")
+
+current_info_avg_bound_var_cs = read_csv("current_info_avg_bound_var_cs.csv")
+current_info_avg_bound_var_q = read_csv("current_info_avg_bound_var_q.csv")
+current_info_avg_bound_var_r = read_csv("current_info_avg_bound_var_r.csv")
+
+current_info_avg_bound_welfare = cbind(current_info_avg_bound_mean_cs,current_info_avg_bound_mean_q,current_info_avg_bound_mean_r,
+                                   current_info_avg_bound_var_cs,current_info_avg_bound_var_q,current_info_avg_bound_var_r)
+colnames(current_info_avg_bound_welfare) = c("mean_cs", "mean_q", "mean_r","var_cs", "var_q", "var_r")
+
+current_info_avg_bound_welfare$steps = seq(-0.25, 0.25, by = 0.05)
+current_info_avg_bound_welfare$s_steps = seq(0.75, 1.25, by = 0.05)
+
+current_info_avg_bound_welfare$mean_r_diff = (current_info_avg_bound_welfare$mean_r - r_agg_0)/abs(r_agg_0)*100
+current_info_avg_bound_welfare$var_r_diff = (current_info_avg_bound_welfare$var_r - r_agg_0)/abs(r_agg_0)*100
+
+current_info_avg_bound_welfare$mean_q_diff = (current_info_avg_bound_welfare$mean_q - q_agg_0)/abs(q_agg_0)*100
+current_info_avg_bound_welfare$var_q_diff = (current_info_avg_bound_welfare$var_q - q_agg_0)/abs(q_agg_0)*100
+
+current_info_avg_bound_welfare$mean_cs_diff = (current_info_avg_bound_welfare$mean_cs - cs_agg_0)/abs(cs_agg_0)*100
+current_info_avg_bound_welfare$var_cs_diff = (current_info_avg_bound_welfare$var_cs - cs_agg_0)/abs(cs_agg_0)*100
+
+library(scales)  # For label formatting
+
+r_current_info_avg_bound = ggplot(data = current_info_avg_bound_welfare) +
+  geom_line(aes(x = steps, y = mean_r_diff, color = "mean", linetype = "mean"), linewidth = 2)+
+  geom_line(aes(x = steps, y = var_r_diff, color = "var", linetype = "var"), linewidth = 2)+
+  scale_color_manual(
+    values = c("mean" = "#35618f", "var" = "#8c334c"),
+    labels = c("mean" = "mean", "var" = "var")
+  ) +
+  scale_linetype_manual(
+    values = c("mean" = "solid", "var" = "longdash"),
+    labels = c("mean" = "mean", "var" = "var")
+  ) +
+  scale_x_continuous(
+    name = "E[Prcp]",
+    sec.axis = sec_axis(~ rescale(., from = range(current_info_avg_bound_welfare$steps), to = range(current_info_avg_bound_welfare$s_steps )), 
+                        name = "Min & Max[Prcp]")
+  ) +
+  coord_cartesian(xlim = c(min(range(current_info_avg_bound_welfare$steps))
+                           , max(range(current_info_avg_bound_welfare$steps)))
+  ) +
+  labs(
+    title = "Producer Surplus Change (%)",
+    color = "",
+    linetype = "",
+    x = NULL,
+    y = NULL
+  ) +
   geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
   geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
   big_text +
@@ -650,3 +1370,468 @@ ggplot(data = avg_info_avg_bound_welfare) +
     legend.key.width = unit(2, "cm"),
     plot.title = element_text(hjust = 0.5)
   )
+
+cs_current_info_avg_bound = ggplot(data = current_info_avg_bound_welfare) +
+  geom_line(aes(x = steps, y = mean_cs_diff, color = "mean", linetype = "mean"), linewidth = 2)+
+  geom_line(aes(x = steps, y = var_cs_diff, color = "var", linetype = "var"), linewidth = 2)+
+  scale_color_manual(
+    values = c("mean" = "#35618f", "var" = "#8c334c"),
+    labels = c("mean" = "mean", "var" = "var")
+  ) +
+  scale_linetype_manual(
+    values = c("mean" = "solid", "var" = "longdash"),
+    labels = c("mean" = "mean", "var" = "var")
+  ) +
+  scale_x_continuous(
+    name = "E[Prcp]",
+    sec.axis = sec_axis(~ rescale(., from = range(current_info_avg_bound_welfare$steps), to = range(current_info_avg_bound_welfare$s_steps )), 
+                        name = "Min & Max[Prcp]")
+  ) +
+  coord_cartesian(xlim = c(min(range(current_info_avg_bound_welfare$steps))
+                           , max(range(current_info_avg_bound_welfare$steps)))
+  ) +
+  labs(
+    title = "Consumer Surplus Change (%)",
+    color = "",
+    linetype = "",
+    x = NULL,
+    y = NULL
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  big_text +
+  theme(
+    legend.position = "bottom",
+    legend.key.width = unit(2, "cm"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+q_current_info_avg_bound = ggplot(data = current_info_avg_bound_welfare) +
+  geom_line(aes(x = steps, y = mean_q_diff, color = "mean", linetype = "mean"), linewidth = 2)+
+  geom_line(aes(x = steps, y = var_q_diff, color = "var", linetype = "var"), linewidth = 2)+
+  scale_color_manual(
+    values = c("mean" = "#35618f", "var" = "#8c334c"),
+    labels = c("mean" = "mean", "var" = "var")
+  ) +
+  scale_linetype_manual(
+    values = c("mean" = "solid", "var" = "longdash"),
+    labels = c("mean" = "mean", "var" = "var")
+  ) +
+  scale_x_continuous(
+    name = "E[Prcp]",
+    sec.axis = sec_axis(~ rescale(., from = range(current_info_avg_bound_welfare$steps), to = range(current_info_avg_bound_welfare$s_steps )), 
+                        name = "Min & Max[Prcp]")
+  ) +
+  coord_cartesian(xlim = c(min(range(current_info_avg_bound_welfare$steps))
+                           , max(range(current_info_avg_bound_welfare$steps)))
+  ) +
+  labs(
+    title = "Total Quantity Change (%)",
+    color = "",
+    linetype = "",
+    x = NULL,
+    y = NULL
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black") +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+  big_text +
+  theme(
+    legend.position = "bottom",
+    legend.key.width = unit(2, "cm"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+ggplot(data = current_info_avg_bound_welfare) +
+  geom_line(aes(x = steps, y = mean_r_diff, color = "r"), linetype = "dotdash",linewidth = 2)+
+  geom_line(aes(x = steps, y = mean_cs_diff, color = "cs"), linetype = "longdash", linewidth = 2)+
+  geom_line(aes(x = steps, y = mean_q_diff, color = "q"), linetype = "solid", linewidth = 2)+
+  scale_color_manual(
+    values = c("r" = "#316387", "cs" = "#842411", "q" = "#256b33"),
+    labels = c("r" = "PS", "cs" = "CS", "q" = "Q")
+  ) +
+  coord_cartesian(xlim = c(min(range(current_info_avg_bound_welfare$steps))
+                           , max(range(current_info_avg_bound_welfare$steps)))
+  ) +
+  labs(
+    #title = "Welfare Change (%)",
+    color = "Type",
+    linetype = "Type",
+    x = "Δ E[Prcp] (Inches)",
+    y = "%"
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  big_text +
+  theme(
+    legend.position = "bottom",
+    legend.key.width = unit(2, "cm"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+
+ggplot(data = current_info_avg_bound_welfare) +
+  geom_line(aes(x = s_steps, y = var_r_diff, color = "r"), linetype = "dotdash",linewidth = 2)+
+  geom_line(aes(x = s_steps, y = var_cs_diff, color = "cs"), linetype = "longdash", linewidth = 2)+
+  geom_line(aes(x = s_steps, y = var_q_diff, color = "q"), linetype = "solid", linewidth = 2)+
+  scale_color_manual(
+    values = c("r" = "#316387", "cs" = "#842411", "q" = "#256b33"),
+    labels = c("r" = "PS", "cs" = "CS", "q" = "Q")
+  ) +
+  coord_cartesian(xlim = c(min(range(current_info_avg_bound_welfare$s_steps))
+                           , max(range(current_info_avg_bound_welfare$s_steps)))
+  ) +
+  labs(
+    #title = "Welfare Change (%)",
+    color = "Type",
+    linetype = "Type",
+    x = "SD Ratio",
+    y = "%"
+  ) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "black", linewidth = 0.8) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  big_text +
+  theme(
+    legend.position = "bottom",
+    legend.key.width = unit(2, "cm"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+mean(current_info_avg_bound_welfare[which(current_info_avg_bound_welfare$s_steps<1),]$var_cs_diff)
+#16.01809
+mean(current_info_avg_bound_welfare[which(current_info_avg_bound_welfare$s_steps>1),]$var_cs_diff)
+#-24.77576
+
+##### current_info_logr_bound ####
+
+current_info_logr_bound_mean_cs = read_csv("current_info_logr_bound_mean_cs.csv")
+current_info_logr_bound_mean_q = read_csv("current_info_logr_bound_mean_q.csv")
+current_info_logr_bound_mean_r = read_csv("current_info_logr_bound_mean_r.csv")
+
+current_info_logr_bound_var_cs = read_csv("current_info_logr_bound_var_cs.csv")
+current_info_logr_bound_var_q = read_csv("current_info_logr_bound_var_q.csv")
+current_info_logr_bound_var_r = read_csv("current_info_logr_bound_var_r.csv")
+
+current_info_logr_bound_welfare = cbind(current_info_logr_bound_mean_cs,current_info_logr_bound_mean_q,current_info_logr_bound_mean_r,
+                                        current_info_logr_bound_var_cs,current_info_logr_bound_var_q,current_info_logr_bound_var_r)
+colnames(current_info_logr_bound_welfare) = c("mean_cs", "mean_q", "mean_r","var_cs", "var_q", "var_r")
+
+current_info_logr_bound_welfare$steps = seq(-0.25, 0.25, by = 0.05)
+current_info_logr_bound_welfare$s_steps = seq(0.75, 1.25, by = 0.05)
+
+current_info_logr_bound_welfare$mean_r_diff = (current_info_logr_bound_welfare$mean_r - r_agg_0)/abs(r_agg_0)*100
+current_info_logr_bound_welfare$var_r_diff = (current_info_logr_bound_welfare$var_r - r_agg_0)/abs(r_agg_0)*100
+
+current_info_logr_bound_welfare$mean_q_diff = (current_info_logr_bound_welfare$mean_q - q_agg_0)/abs(q_agg_0)*100
+current_info_logr_bound_welfare$var_q_diff = (current_info_logr_bound_welfare$var_q - q_agg_0)/abs(q_agg_0)*100
+
+current_info_logr_bound_welfare$mean_cs_diff = (current_info_logr_bound_welfare$mean_cs - cs_agg_0)/abs(cs_agg_0)*100
+current_info_logr_bound_welfare$var_cs_diff = (current_info_logr_bound_welfare$var_cs - cs_agg_0)/abs(cs_agg_0)*100
+
+ggplot(data = current_info_logr_bound_welfare) +
+  geom_line(aes(x = steps, y = mean_r_diff, color = "r"), linetype = "dotdash",linewidth = 2)+
+  geom_line(aes(x = steps, y = mean_cs_diff, color = "cs"), linetype = "longdash", linewidth = 2)+
+  geom_line(aes(x = steps, y = mean_q_diff, color = "q"), linetype = "solid", linewidth = 2)+
+  scale_color_manual(
+    values = c("r" = "#316387", "cs" = "#842411", "q" = "#256b33"),
+    labels = c("r" = "PS", "cs" = "CS", "q" = "Q")
+  ) +
+  coord_cartesian(xlim = c(min(range(current_info_logr_bound_welfare$steps))
+                           , max(range(current_info_logr_bound_welfare$steps)))
+  ) +
+  labs(
+    #title = "Welfare Change (%)",
+    color = "Type",
+    linetype = "Type",
+    x = "Δ E[Prcp] (Inches)",
+    y = "%"
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  big_text +
+  theme(
+    legend.position = "bottom",
+    legend.key.width = unit(2, "cm"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+
+ggplot(data = current_info_logr_bound_welfare) +
+  geom_line(aes(x = s_steps, y = var_r_diff, color = "r"), linetype = "dotdash",linewidth = 2)+
+  geom_line(aes(x = s_steps, y = var_cs_diff, color = "cs"), linetype = "longdash", linewidth = 2)+
+  geom_line(aes(x = s_steps, y = var_q_diff, color = "q"), linetype = "solid", linewidth = 2)+
+  scale_color_manual(
+    values = c("r" = "#316387", "cs" = "#842411", "q" = "#256b33"),
+    labels = c("r" = "PS", "cs" = "CS", "q" = "Q")
+  ) +
+  coord_cartesian(xlim = c(min(range(current_info_logr_bound_welfare$s_steps))
+                           , max(range(current_info_logr_bound_welfare$s_steps)))
+  ) +
+  labs(
+    #title = "Welfare Change (%)",
+    color = "Type",
+    linetype = "Type",
+    x = "SD Ratio",
+    y = "%"
+  ) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "black", linewidth = 0.8) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  big_text +
+  theme(
+    legend.position = "bottom",
+    legend.key.width = unit(2, "cm"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+mean(current_info_logr_bound_welfare[which(current_info_logr_bound_welfare$s_steps<1),]$var_cs_diff)
+#21.91156
+mean(current_info_logr_bound_welfare[which(current_info_logr_bound_welfare$s_steps>1),]$var_cs_diff)
+#-47.01439
+
+##### current_info_gamma05_bound ####
+
+current_info_gamma05_bound_mean_cs = read_csv("current_info_gamma05_bound_mean_cs.csv")
+current_info_gamma05_bound_mean_q = read_csv("current_info_gamma05_bound_mean_q.csv")
+current_info_gamma05_bound_mean_r = read_csv("current_info_gamma05_bound_mean_r.csv")
+
+current_info_gamma05_bound_var_cs = read_csv("current_info_gamma05_bound_var_cs.csv")
+current_info_gamma05_bound_var_q = read_csv("current_info_gamma05_bound_var_q.csv")
+current_info_gamma05_bound_var_r = read_csv("current_info_gamma05_bound_var_r.csv")
+
+current_info_gamma05_bound_welfare = cbind(current_info_gamma05_bound_mean_cs,current_info_gamma05_bound_mean_q,current_info_gamma05_bound_mean_r,
+                                        current_info_gamma05_bound_var_cs,current_info_gamma05_bound_var_q,current_info_gamma05_bound_var_r)
+colnames(current_info_gamma05_bound_welfare) = c("mean_cs", "mean_q", "mean_r","var_cs", "var_q", "var_r")
+
+current_info_gamma05_bound_welfare$steps = seq(-0.25, 0.25, by = 0.05)
+current_info_gamma05_bound_welfare$s_steps = seq(0.75, 1.25, by = 0.05)
+
+current_info_gamma05_bound_welfare$mean_r_diff = (current_info_gamma05_bound_welfare$mean_r - r_agg_0)/abs(r_agg_0)*100
+current_info_gamma05_bound_welfare$var_r_diff = (current_info_gamma05_bound_welfare$var_r - r_agg_0)/abs(r_agg_0)*100
+
+current_info_gamma05_bound_welfare$mean_q_diff = (current_info_gamma05_bound_welfare$mean_q - q_agg_0)/abs(q_agg_0)*100
+current_info_gamma05_bound_welfare$var_q_diff = (current_info_gamma05_bound_welfare$var_q - q_agg_0)/abs(q_agg_0)*100
+
+current_info_gamma05_bound_welfare$mean_cs_diff = (current_info_gamma05_bound_welfare$mean_cs - cs_agg_0)/abs(cs_agg_0)*100
+current_info_gamma05_bound_welfare$var_cs_diff = (current_info_gamma05_bound_welfare$var_cs - cs_agg_0)/abs(cs_agg_0)*100
+
+ggplot(data = current_info_gamma05_bound_welfare) +
+  geom_line(aes(x = steps, y = mean_r_diff, color = "r"), linetype = "dotdash",linewidth = 2)+
+  geom_line(aes(x = steps, y = mean_cs_diff, color = "cs"), linetype = "longdash", linewidth = 2)+
+  geom_line(aes(x = steps, y = mean_q_diff, color = "q"), linetype = "solid", linewidth = 2)+
+  scale_color_manual(
+    values = c("r" = "#316387", "cs" = "#842411", "q" = "#256b33"),
+    labels = c("r" = "PS", "cs" = "CS", "q" = "Q")
+  ) +
+  coord_cartesian(xlim = c(min(range(current_info_gamma05_bound_welfare$steps))
+                           , max(range(current_info_gamma05_bound_welfare$steps)))
+  ) +
+  labs(
+    #title = "Welfare Change (%)",
+    color = "Type",
+    linetype = "Type",
+    x = "Δ E[Prcp] (Inches)",
+    y = "%"
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  big_text +
+  theme(
+    legend.position = "bottom",
+    legend.key.width = unit(2, "cm"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+
+ggplot(data = current_info_gamma05_bound_welfare) +
+  geom_line(aes(x = s_steps, y = var_r_diff, color = "r"), linetype = "dotdash",linewidth = 2)+
+  geom_line(aes(x = s_steps, y = var_cs_diff, color = "cs"), linetype = "longdash", linewidth = 2)+
+  geom_line(aes(x = s_steps, y = var_q_diff, color = "q"), linetype = "solid", linewidth = 2)+
+  scale_color_manual(
+    values = c("r" = "#316387", "cs" = "#842411", "q" = "#256b33"),
+    labels = c("r" = "PS", "cs" = "CS", "q" = "Q")
+  ) +
+  coord_cartesian(xlim = c(min(range(current_info_gamma05_bound_welfare$s_steps))
+                           , max(range(current_info_gamma05_bound_welfare$s_steps)))
+  ) +
+  labs(
+    #title = "Welfare Change (%)",
+    color = "Type",
+    linetype = "Type",
+    x = "SD Ratio",
+    y = "%"
+  ) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "black", linewidth = 0.8) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  big_text +
+  theme(
+    legend.position = "bottom",
+    legend.key.width = unit(2, "cm"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+mean(current_info_gamma05_bound_welfare[which(current_info_gamma05_bound_welfare$s_steps<1),]$var_cs_diff)
+#20.67548
+mean(current_info_gamma05_bound_welfare[which(current_info_gamma05_bound_welfare$s_steps>1),]$var_cs_diff)
+#-37.66772
+
+##### current_info_extreme_bound ####
+
+current_info_extreme_bound_mean_cs = read_csv("current_info_extreme_bound_mean_cs.csv")
+current_info_extreme_bound_mean_q = read_csv("current_info_extreme_bound_mean_q.csv")
+current_info_extreme_bound_mean_r = read_csv("current_info_extreme_bound_mean_r.csv")
+
+current_info_extreme_bound_var_cs = read_csv("current_info_extreme_bound_var_cs.csv")
+current_info_extreme_bound_var_q = read_csv("current_info_extreme_bound_var_q.csv")
+current_info_extreme_bound_var_r = read_csv("current_info_extreme_bound_var_r.csv")
+
+current_info_extreme_bound_welfare = cbind(current_info_extreme_bound_mean_cs,current_info_extreme_bound_mean_q,current_info_extreme_bound_mean_r,
+                                       current_info_extreme_bound_var_cs,current_info_extreme_bound_var_q,current_info_extreme_bound_var_r)
+colnames(current_info_extreme_bound_welfare) = c("mean_cs", "mean_q", "mean_r","var_cs", "var_q", "var_r")
+
+current_info_extreme_bound_welfare$steps = seq(-0.25, 0.25, by = 0.05)
+current_info_extreme_bound_welfare$s_steps = seq(0.75, 1.25, by = 0.05)
+
+current_info_extreme_bound_welfare$mean_r_diff = (current_info_extreme_bound_welfare$mean_r - r_agg_0)/abs(r_agg_0)*100
+current_info_extreme_bound_welfare$var_r_diff = (current_info_extreme_bound_welfare$var_r - r_agg_0)/abs(r_agg_0)*100
+
+current_info_extreme_bound_welfare$mean_q_diff = (current_info_extreme_bound_welfare$mean_q - q_agg_0)/abs(q_agg_0)*100
+current_info_extreme_bound_welfare$var_q_diff = (current_info_extreme_bound_welfare$var_q - q_agg_0)/abs(q_agg_0)*100
+
+current_info_extreme_bound_welfare$mean_cs_diff = (current_info_extreme_bound_welfare$mean_cs - cs_agg_0)/abs(cs_agg_0)*100
+current_info_extreme_bound_welfare$var_cs_diff = (current_info_extreme_bound_welfare$var_cs - cs_agg_0)/abs(cs_agg_0)*100
+
+ggplot(data = current_info_extreme_bound_welfare) +
+  geom_line(aes(x = steps, y = mean_r_diff, color = "r"), linetype = "dotdash",linewidth = 2)+
+  geom_line(aes(x = steps, y = mean_cs_diff, color = "cs"), linetype = "longdash", linewidth = 2)+
+  geom_line(aes(x = steps, y = mean_q_diff, color = "q"), linetype = "solid", linewidth = 2)+
+  scale_color_manual(
+    values = c("r" = "#316387", "cs" = "#842411", "q" = "#256b33"),
+    labels = c("r" = "PS", "cs" = "CS", "q" = "Q")
+  ) +
+  coord_cartesian(xlim = c(min(range(current_info_extreme_bound_welfare$steps))
+                           , max(range(current_info_extreme_bound_welfare$steps)))
+  ) +
+  labs(
+    #title = "Welfare Change (%)",
+    color = "Type",
+    linetype = "Type",
+    x = "Δ E[Prcp] (Inches)",
+    y = "%"
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  big_text +
+  theme(
+    legend.position = "bottom",
+    legend.key.width = unit(2, "cm"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+
+ggplot(data = current_info_extreme_bound_welfare) +
+  geom_line(aes(x = s_steps, y = var_r_diff, color = "r"), linetype = "dotdash",linewidth = 2)+
+  geom_line(aes(x = s_steps, y = var_cs_diff, color = "cs"), linetype = "longdash", linewidth = 2)+
+  geom_line(aes(x = s_steps, y = var_q_diff, color = "q"), linetype = "solid", linewidth = 2)+
+  scale_color_manual(
+    values = c("r" = "#316387", "cs" = "#842411", "q" = "#256b33"),
+    labels = c("r" = "PS", "cs" = "CS", "q" = "Q")
+  ) +
+  coord_cartesian(xlim = c(min(range(current_info_extreme_bound_welfare$s_steps))
+                           , max(range(current_info_extreme_bound_welfare$s_steps)))
+  ) +
+  labs(
+    #title = "Welfare Change (%)",
+    color = "Type",
+    linetype = "Type",
+    x = "SD Ratio",
+    y = "%"
+  ) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "black", linewidth = 0.8) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  big_text +
+  theme(
+    legend.position = "bottom",
+    legend.key.width = unit(2, "cm"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+##### current_info_soft_bound ####
+
+current_info_soft_bound_mean_cs = read_csv("current_info_soft_bound_mean_cs.csv")
+current_info_soft_bound_mean_q = read_csv("current_info_soft_bound_mean_q.csv")
+current_info_soft_bound_mean_r = read_csv("current_info_soft_bound_mean_r.csv")
+
+current_info_soft_bound_var_cs = read_csv("current_info_soft_bound_var_cs.csv")
+current_info_soft_bound_var_q = read_csv("current_info_soft_bound_var_q.csv")
+current_info_soft_bound_var_r = read_csv("current_info_soft_bound_var_r.csv")
+
+current_info_soft_bound_welfare = cbind(current_info_soft_bound_mean_cs,current_info_soft_bound_mean_q,current_info_soft_bound_mean_r,
+                                           current_info_soft_bound_var_cs,current_info_soft_bound_var_q,current_info_soft_bound_var_r)
+colnames(current_info_soft_bound_welfare) = c("mean_cs", "mean_q", "mean_r","var_cs", "var_q", "var_r")
+
+current_info_soft_bound_welfare$steps = seq(-0.25, 0.25, by = 0.05)
+current_info_soft_bound_welfare$s_steps = seq(0.75, 1.25, by = 0.05)
+
+current_info_soft_bound_welfare$mean_r_diff = (current_info_soft_bound_welfare$mean_r - r_agg_0)/abs(r_agg_0)*100
+current_info_soft_bound_welfare$var_r_diff = (current_info_soft_bound_welfare$var_r - r_agg_0)/abs(r_agg_0)*100
+
+current_info_soft_bound_welfare$mean_q_diff = (current_info_soft_bound_welfare$mean_q - q_agg_0)/abs(q_agg_0)*100
+current_info_soft_bound_welfare$var_q_diff = (current_info_soft_bound_welfare$var_q - q_agg_0)/abs(q_agg_0)*100
+
+current_info_soft_bound_welfare$mean_cs_diff = (current_info_soft_bound_welfare$mean_cs - cs_agg_0)/abs(cs_agg_0)*100
+current_info_soft_bound_welfare$var_cs_diff = (current_info_soft_bound_welfare$var_cs - cs_agg_0)/abs(cs_agg_0)*100
+
+ggplot(data = current_info_soft_bound_welfare) +
+  geom_line(aes(x = steps, y = mean_r_diff, color = "r"), linetype = "dotdash",linewidth = 2)+
+  geom_line(aes(x = steps, y = mean_cs_diff, color = "cs"), linetype = "longdash", linewidth = 2)+
+  geom_line(aes(x = steps, y = mean_q_diff, color = "q"), linetype = "solid", linewidth = 2)+
+  scale_color_manual(
+    values = c("r" = "#316387", "cs" = "#842411", "q" = "#256b33"),
+    labels = c("r" = "PS", "cs" = "CS", "q" = "Q")
+  ) +
+  coord_cartesian(xlim = c(min(range(current_info_soft_bound_welfare$steps))
+                           , max(range(current_info_soft_bound_welfare$steps)))
+  ) +
+  labs(
+    #title = "Welfare Change (%)",
+    color = "Type",
+    linetype = "Type",
+    x = "Δ E[Prcp] (Inches)",
+    y = "%"
+  ) +
+  geom_vline(xintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  big_text +
+  theme(
+    legend.position = "bottom",
+    legend.key.width = unit(2, "cm"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
+
+ggplot(data = current_info_soft_bound_welfare) +
+  geom_line(aes(x = s_steps, y = var_r_diff, color = "r"), linetype = "dotdash",linewidth = 2)+
+  geom_line(aes(x = s_steps, y = var_cs_diff, color = "cs"), linetype = "longdash", linewidth = 2)+
+  geom_line(aes(x = s_steps, y = var_q_diff, color = "q"), linetype = "solid", linewidth = 2)+
+  scale_color_manual(
+    values = c("r" = "#316387", "cs" = "#842411", "q" = "#256b33"),
+    labels = c("r" = "PS", "cs" = "CS", "q" = "Q")
+  ) +
+  coord_cartesian(xlim = c(min(range(current_info_soft_bound_welfare$s_steps))
+                           , max(range(current_info_soft_bound_welfare$s_steps)))
+  ) +
+  labs(
+    #title = "Welfare Change (%)",
+    color = "Type",
+    linetype = "Type",
+    x = "SD Ratio",
+    y = "%"
+  ) +
+  geom_vline(xintercept = 1, linetype = "dashed", color = "black", linewidth = 0.8) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "black", linewidth = 0.8) +
+  big_text +
+  theme(
+    legend.position = "bottom",
+    legend.key.width = unit(2, "cm"),
+    plot.title = element_text(hjust = 0.5)
+  )
+
