@@ -1,10 +1,11 @@
 # 💧 Rain or Shine? Optimal Utility Pricing under Weather Variability
 
-**Author**: Gordon Ji
-**Degree**: Ph.D. in Economics
-**Advisor**: Dr. Eugenio Miravete
-**Institution**: [University of Texas at Austin]
+**Author**: Gordon Ji  
+**Degree**: Ph.D. in Economics  
+**Advisor**: Dr. Eugenio Miravete  
+**Institution**: University of Texas at Austin  
 **Year**: 2025-2026
+
 
 ---
 
