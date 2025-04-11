@@ -19,7 +19,6 @@
 > In contrast, when precipitation variance is low, introducing concavity makes the distributional effect more regressive.
 
 ---
-## Noted that due to the data security agreement, the data is not uploaded, but only the codes are included in this repository. 
 ## 📂 Repository Structure
 
 ```text
@@ -29,3 +28,36 @@
 ├── counterfactual_temp/        # Counterfactual analysis that's not been used
 ├── counterfactual_ramsey/      # Counterfactual analysis of Ramsey Pricing Model
 └── README.md                   # Project overview (this file)
+```
+---
+
+## 🧠 Overview
+
+This repository accompanies my dissertation research on the intersection of utility pricing, climate variability, and economic welfare. It includes:
+
+- A structural DCC model of household water demand
+- Counterfactual simulations of Ramsey pricing under different precipitation variances
+- Distributional and revenue tradeoff analysis under risk-averse utility preferences
+
+---
+
+## 📊 Data
+
+The data come from Austin Water's monthly transaction records between 2018–2019.  
+Due to privacy constraints, raw data are not publicly included.  
+
+---
+
+## 📝 License
+
+This project is released under the [MIT License](LICENSE), unless otherwise stated.
+
+
+---
+
+## 🙋‍♂️ Contact
+
+If you have questions or want to collaborate, feel free to reach out:  
+📧 [guozhenj@utexas.edu], [gordonjgz@gmail.com]
+
+---
