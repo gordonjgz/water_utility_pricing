@@ -23,7 +23,7 @@
 ## 📂 Repository Structure
 
 ```text
-├── pre_analysis/               # Data cleaning, GIS data and NDVI
+├── pre_analysis/               # Data cleaning, GIS data, and NDVI
 ├── demand/                     # Demand Estimation
 ├── price_elasticity/           # Code to generate price elasticity
 ├── counterfactual_temp/        # Counterfactual analysis that's not been used
@@ -44,7 +44,7 @@ This repository accompanies my dissertation research on the intersection of util
 
 ## 📊 Data
 
-The data come from Austin Water's monthly transaction records between 2018–2019.  
+The data come from Austin Water's monthly transaction records.  
 Due to privacy constraints, raw data are not publicly included.  
 
 ---
