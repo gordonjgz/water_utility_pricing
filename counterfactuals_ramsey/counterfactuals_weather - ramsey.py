@@ -473,6 +473,44 @@ p_l0_CAP =  jnp.array([2.37+0.05, 4.05+0.05, 6.67+0.05, 11.51+0.05, 14.21+0.05])
 
 result = np.genfromtxt('result.csv', delimiter=',', skip_header=0)
 
+p_plus1_l0 = jnp.append(p_l0[1:5],jnp.array([jnp.nan]) )
+d_end0 = jnp.cumsum( (p_plus1_l0-0.2 - (p_l0-0.2)) [:4] *q_l0)
+d_end0 =  jnp.insert(d_end0, 0, jnp.array([0.0]) )
+
+p_plus1_l0_CAP = jnp.append(p_l0_CAP[1:5],jnp.array([jnp.nan]) )
+d_end0_CAP = jnp.cumsum( (p_plus1_l0_CAP-0.2 - (p_l0_CAP-0.2)) [:4] *q_l0)
+d_end0_CAP =  jnp.insert(d_end0_CAP, 0, jnp.array([0.0]) )
+
+def calculate_dk (k):
+    result = -fc_l0[k] + d_end0[k]
+    return result
+calculate_dk_jitted = jax.jit(calculate_dk)
+
+def calculate_dk_CAP (k):
+    result = -fc_l0[k] + d_end0_CAP[k]
+    return result
+calculate_dk_CAP_jitted = jax.jit(calculate_dk_CAP)
+CAP = jnp.array(demand_2018_using_new['CAP_HH'])
+
+def get_k0(q, q_l):
+    conditions_k = [
+        (q<q_l[0]),
+        (( q >=q_l[0]) & (q < q_l[1])), 
+        (( q >=q_l[1]) & (q < q_l[2])),
+        (( q >=q_l[2]) & (q < q_l[3])),
+        (q >= q_l[3]),
+    ]  
+    choices = [
+        0,
+        1,
+        2,
+        3,
+        4
+    ]
+    result = jnp.select(conditions_k, choices)
+    return result
+get_k0_jitted = jax.jit(get_k0)
+
 beta = result[0]
 se = result[1]
 
@@ -701,6 +739,10 @@ w_i = jnp.array(demand_2018_using_new['quantity'])
 de = jnp.array(demand_2018_using_new['deflator'])
 q_statusquo = jnp.array(demand_2018_using_new['quantity'])
 
+k0 = get_k0_jitted(q_statusquo, q_l0)
+
+d_k0 = jnp.where(CAP == 1, calculate_dk_CAP_jitted(k0), calculate_dk_jitted(k0))
+
 q_statusquo_sum = jnp.sum(q_statusquo)
 
 alpha = jnp.exp(jnp.dot(A_current_price, b4)
@@ -922,7 +964,8 @@ q0_sum =nansum_ignore_nan_inf_jitted(q0)
 q0_mean = nanmean_ignore_nan_inf_jitted(q0)
 
 def get_r_mean(q_mean, p_l, q_l, fc_l):
-    def expenditure_func(w, p_l=p_l, q_l=q_l, fc_l=fc_l):
+    p_l_CAP = p_l-p_l0 + p_l0_CAP
+    def expenditure_func(w, p_l, q_l, fc_l):
         bins = jnp.concatenate((jnp.array([0]), q_l, jnp.array([jnp.inf])))
         binned_data = jnp.digitize(w, bins)
         q_plus1_l = jnp.insert(q_l, 0, 0)
@@ -932,7 +975,7 @@ def get_r_mean(q_mean, p_l, q_l, fc_l):
                            fc_l[binned_data-1] + cumu_sum[binned_data-2] + p_l[binned_data-1] * (w - q_l[binned_data-2]))
         return result
     expenditure_func_jitted = jax.jit(expenditure_func)
-    r_mean = expenditure_func_jitted(q_mean)
+    r_mean = jnp.where(CAP==1,expenditure_func_jitted(q_mean, p_l_CAP, q_l, fc_l) , expenditure_func_jitted(q_mean, p_l, q_l, fc_l))
     return r_mean
 get_r_mean_jitted = jax.jit(get_r_mean)
 
@@ -1108,32 +1151,55 @@ get_k_jitted = jax.jit(get_k)
 
 
 def get_virtual_income(q_sum_hh, p_l, q_l, fc_l):
-    q_kink_l =q_l
+    p_l_CAP = p_l-p_l0 + p_l0_CAP
+    q_kink_l = q_l
     p_plus1_l = jnp.append(p_l[1:5],jnp.array([jnp.nan]) )
-    d_end = jnp.cumsum( (p_plus1_l - p_l)[:4] *q_kink_l)
+    d_end = jnp.cumsum( (p_plus1_l-0.2 - (p_l-0.2)) [:4] *q_kink_l)
     d_end =  jnp.insert(d_end, 0, jnp.array([0.0]) )
+    
+    p_plus1_l_CAP = jnp.append(p_l_CAP[1:5],jnp.array([jnp.nan]) )
+    d_end_CAP = jnp.cumsum( (p_plus1_l_CAP-0.2 - (p_l_CAP-0.2)) [:4] *q_kink_l)
+    d_end_CAP =  jnp.insert(d_end_CAP, 0, jnp.array([0.0]) )
     def calculate_dk (k):
         result = -fc_l[k] + d_end[k]
         return result
     calculate_dk_jitted = jax.jit(calculate_dk)
+    def calculate_dk_CAP (k):
+        result = -fc_l[k] + d_end_CAP[k]
+        return result
+    calculate_dk_CAP_jitted = jax.jit(calculate_dk_CAP)
     
     k = get_k_jitted(q_sum_hh, q_l)
-    virtual_income = jnp.maximum(jnp.multiply(jnp.transpose(calculate_dk_jitted(k)), de) + I, 1e-16)
+    d_k = jnp.where(CAP == 1, calculate_dk_CAP_jitted(k), calculate_dk_jitted(k))
+    virtual_income = jnp.maximum(jnp.multiply(d_k, de) + I, 1e-16)
     return virtual_income
 get_virtual_income_jitted = jax.jit(get_virtual_income)
 
-alpha = jnp.exp(jnp.dot(A_current_price, b4)
-                    + c_alpha)
+#alpha = jnp.exp(jnp.dot(A_current_price, b4)
+ #                   + c_alpha)
 
 def get_current_marginal_p(q_sum_hh, p_l, q_l, fc_l):
+    p_l_CAP = p_l-p_l0 + p_l0_CAP
     k = get_k_jitted(q_sum_hh, q_l)
-    p = p_l[k]
+    p = jnp.where(CAP == 1,p_l_CAP[k], p_l[k])
     return p
 get_current_marginal_p_jitted = jax.jit(get_current_marginal_p)
 
 def get_expenditure_in_v_out(q_sum_hh, p_l, q_l, fc_l, Z):
+    A_p= jnp.column_stack((
+        bedroom, 
+        prev_NDVI, 
+        Z[:, 0],
+        Z[:, 2],
+    ))
+    alpha = jnp.exp(jnp.dot(A_p, b4)
+                + c_alpha
+            )
+    #rho = abs(jnp.dot(A_i, b6)
+     #           + c_rho
+      #          )
     p = get_current_marginal_p_jitted(q_sum_hh, p_l, q_l, fc_l)
-    result = jnp.multiply(jnp.exp(jnp.dot(A_current_outdoor, b1) + jnp.dot(Z, b2)), 
+    result = jnp.multiply(jnp.exp(jnp.dot(A_current_outdoor, b1) + jnp.dot(Z, b2)+ c_o + eta_l), 
                                          jnp.divide(jnp.power(p, 1-alpha), jnp.array(1-alpha)))
     return result
 get_expenditure_in_v_out_jitted = jax.jit(get_expenditure_in_v_out)
@@ -1200,7 +1266,7 @@ mask = jnp.arange(max_len) < valid_month_lengths[:, None]
 
 # Apply mask after slicing
 mean_r0 = jnp.array([
-    (rhistory[padded_month_indices[i]] * mask[i]).sum() / valid_month_lengths[i]
+    (r0[padded_month_indices[i]] * mask[i]).sum() / valid_month_lengths[i]
     for i in range(12)
 ])
 
@@ -1211,7 +1277,7 @@ total_r0 = min_mean_r0 * valid_month_lengths[min_month_r0]*12
  # Apply mask after slicing
 mean_q0 = jnp.array([
      #(q0_mean[padded_month_indices[i]] * mask[i, :, None]).sum(axis=0) / valid_month_lengths[i]
-     ( (q_sum_hhhistory/sim) [padded_month_indices[i]] * mask[i]).sum() / valid_month_lengths[i]
+     ( (q_sum_hh0/sim) [padded_month_indices[i]] * mask[i]).sum() / valid_month_lengths[i]
      for i in range(12)
 ])
 max_mean_q0 = jnp.max(mean_q0)      
@@ -1234,6 +1300,76 @@ def crra(x, gamma):
 
 crra_jitted = jax.jit(crra)
 
+######################
+#### Status Quo Result #####
+########################
+
+def describe(array):
+    """
+    Generate descriptive statistics for a NumPy array.
+    Parameters:
+    array (numpy.ndarray): The input array.
+    
+    Returns:
+    dict: A dictionary containing the descriptive statistics.
+    """
+    description = {
+        'count': array.size,
+        'mean': np.mean(array),
+        'std': np.std(array),
+        'min': np.min(array),
+        '25%': np.percentile(array, 25),
+        '50%': np.median(array),
+        '75%': np.percentile(array, 75),
+        'max': np.max(array)
+    }
+    return description
+
+#r0_filtered = r0[r0 < 20000]
+
+#r_agg_0 = nansum_ignore_nan_inf_jitted(r0_filtered)/12
+r_agg_history = nansum_ignore_nan_inf_jitted(rhistory )/12
+#Array(24357931.65120108, dtype=float64)
+r_agg_0 = nansum_ignore_nan_inf_jitted(r0 )/12
+#Array(7258370.97836945, dtype=float64)
+
+#q_sum_hh_1417 = get_q_sum_hh_jitted(p_l0, q_l0, fc_l0, Z_1417)
+#q0_filtered = q_sum_hh_current[q_sum_hh_current < 150000]
+#q0_filtered = q_sum_hh_history[q_sum_hh_history < 150000]
+q_agg_history = nansum_ignore_nan_inf_jitted(q_sum_hhhistory/100)/12
+# Array(1873818.19426824, dtype=float64)
+q_agg_0 = nansum_ignore_nan_inf_jitted(q_sum_hh0/100)/12
+#Array(794810.84743965, dtype=float64)
+
+cs_history = get_v_out_jitted(q_sum_hhhistory , p_l0, q_l0, fc_l0, Z_1417)
+#cs0_filtered = cs_0[(cs_0 > -0.5*1e9) ]
+cs_agg_history = nansum_ignore_nan_inf_jitted(cs_history)/12
+#Array(-16472436.102381, dtype=float64)
+cs_0 = get_v_out_jitted(q_sum_hh0, p_l0, q_l0, fc_l0, Z_current)
+cs_agg_0= nansum_ignore_nan_inf_jitted(cs_0)/12
+#Array(-7896280.43952414, dtype=float64)
+
+# Combine the arrays into a pandas DataFrame
+detail_0 = pd.DataFrame({
+    'r0': r0,
+    'q_sum_hh0': q_sum_hh0/100,
+    'cs_0': cs_0
+})
+
+# Export the DataFrame to a CSV file
+detail_0.to_csv('ramsey_welfare_result/cs_detail_results/detail_0.csv', index=False)
+
+# Combine the arrays into a pandas DataFrame
+detail_history = pd.DataFrame({
+    'rhistory': rhistory,
+    'q_sum_hhhistory': q_sum_hhhistory/100,
+    'cs_history': cs_history
+})
+
+# Export the DataFrame to a CSV file
+detail_history.to_csv('ramsey_welfare_result/cs_detail_results/detail_history.csv', index=False)
+
+
 ########################
 #### Revenue Conditions #####
 ########################
@@ -1242,7 +1378,7 @@ r0_sum_filtered =  nansum_ignore_nan_inf_jitted(r0 )
 
 rhistory_soft_constraint = 0.8*rhistory_sum_filtered
 
-r0_soft_constraint = 0.9*r0_sum_filtered
+r0_soft_constraint = 0.8*r0_sum_filtered
 
 log_r0_mean_filtered = jnp.log(r0_sum_filtered/12)
 
@@ -1251,14 +1387,16 @@ gamma = 1
 crra_r0_mean_filtered = crra_jitted(r0_sum_filtered/12, gamma)
     
 def revenue_compare(r, r0_benchmark =r0_sum_filtered  ):
-    #r = r * (r < 20000)
-    #mask = r < 20000
-    #result = jnp.zeros_like(r)
-    #result = result.at[jnp.where(mask)].set(r[mask])
-    #r_sum_filtered = nansum_ignore_nan_inf_jitted(r)
+    ### Here r is for the entire year, compared to r0 of entire year
     return r - r0_benchmark
 
 revenue_compare_jitted = jax.jit(revenue_compare)
+
+def revenue_compare_crra(r, r0_benchmark =crra_r0_mean_filtered  ):
+    ### Here r is for the entire month, compared to r0 of entire month
+    return r - r0_benchmark
+
+revenue_compare_crra_jitted = jax.jit(revenue_compare_crra)
 
 ########################
 #### Conservation Conditions #####
@@ -1269,7 +1407,7 @@ q0_sum_mean = jnp.mean(q0_sum)
 
 q0_month_mean = q0_sum_mean/12
 
-q0_sum_soft_constraint = 1.1*q0_sum_mean
+#q0_sum_soft_constraint = 1.1*q0_sum_mean
 
 #q0_sum_max = jnp.mean(total_q0)
 
@@ -1432,24 +1570,6 @@ def revenue_lower_bound_constraint(param, Z):
     r_sum_filtered = nansum_ignore_nan_inf_jitted(r)
     result = revenue_compare_jitted(r_sum_filtered)
     """
-
-    # Create a mask for valid entries
-    max_len = padded_month_indices.shape[1]  # Maximum possible entries in a month
-    mask = jnp.arange(max_len) < valid_month_lengths[:, None]
-
-    # Apply mask after slicing
-    total_r = jnp.array([
-        (r[padded_month_indices[i]] * mask[i]).sum()
-        for i in range(12)
-    ])
-    """     
-    #log_total_r = jnp.log(jnp.maximum(total_r, 1e-16))  
-    #result = revenue_compare_jitted(jnp.sum(log_total_r)/12)
-    """   
-    crra_total_r = crra_jitted(jnp.maximum(total_r, 1e-16), gamma)   
-    result = revenue_compare_jitted(jnp.sum(crra_total_r)/12)
-    """   
-    """
     # Create a mask for valid entries
     max_len = padded_month_indices.shape[1]  # Maximum possible entries in a month
     mask = jnp.arange(max_len) < valid_month_lengths[:, None]
@@ -1498,6 +1618,36 @@ def revenue_lower_bound_constraint(param, Z):
     return result
 
 revenue_lower_bound_constraint_jitted = jax.jit(revenue_lower_bound_constraint)
+
+
+def revenue_lower_bound_crra_constraint(param, Z):
+    p_l, q_l, fc_l = param_to_pq0_jitted(param)
+    ## Take Average
+    processed_Z = average_Z_jitted(Z)
+    del Z
+    #max_prcp = jnp.max(processed_Z[:,2])
+    #max_month = jnp.where(processed_Z[:,2] == max_prcp)[0]
+    q_sum_hh = get_q_sum_hh_jitted(p_l, q_l, fc_l, processed_Z)
+    r = from_q_to_r_jitted(q_sum_hh, p_l, q_l, fc_l)
+    del q_sum_hh
+    # Create a mask for valid entries
+    max_len = padded_month_indices.shape[1]  # Maximum possible entries in a month
+    mask = jnp.arange(max_len) < valid_month_lengths[:, None]
+
+    # Apply mask after slicing
+    total_r = jnp.array([
+        (r[padded_month_indices[i]] * mask[i]).sum()
+        for i in range(12)
+    ]) 
+    crra_total_r = crra_jitted(jnp.maximum(total_r, 1e-16), gamma)   
+    result = revenue_compare_crra_jitted(jnp.sum(crra_total_r)/12) 
+
+    
+    return result
+
+revenue_lower_bound_crra_constraint_jitted = jax.jit(revenue_lower_bound_crra_constraint)
+
+
 
 def get_q_sum_sim_max(p_l, q_l, fc_l, Z):
     log_q = cf_w_jitted(p_l, q_l, fc_l, Z)
@@ -1721,70 +1871,7 @@ param0_high = jnp.array([3, 10, 10, 10, 10,
                     ])
 #p_l, q_l, fc_l = param_to_pq0_jitted(param0)
 
-def describe(array):
-    """
-    Generate descriptive statistics for a NumPy array.
-    Parameters:
-    array (numpy.ndarray): The input array.
-    
-    Returns:
-    dict: A dictionary containing the descriptive statistics.
-    """
-    description = {
-        'count': array.size,
-        'mean': np.mean(array),
-        'std': np.std(array),
-        'min': np.min(array),
-        '25%': np.percentile(array, 25),
-        '50%': np.median(array),
-        '75%': np.percentile(array, 75),
-        'max': np.max(array)
-    }
-    return description
 
-#r0_filtered = r0[r0 < 20000]
-
-#r_agg_0 = nansum_ignore_nan_inf_jitted(r0_filtered)/12
-r_agg_history = nansum_ignore_nan_inf_jitted(rhistory )/12
-#Array(24358482.7035515, dtype=float64)
-r_agg_0 = nansum_ignore_nan_inf_jitted(r0 )/12
-#Array(7258745.08835472, dtype=float64)
-
-#q_sum_hh_1417 = get_q_sum_hh_jitted(p_l0, q_l0, fc_l0, Z_1417)
-#q0_filtered = q_sum_hh_current[q_sum_hh_current < 150000]
-#q0_filtered = q_sum_hh_history[q_sum_hh_history < 150000]
-q_agg_history = nansum_ignore_nan_inf_jitted(q_sum_hhhistory/100)/12
-# Array(1873818.19426824, dtype=float64)
-q_agg_0 = nansum_ignore_nan_inf_jitted(q_sum_hh0/100)/12
-#Array(794810.84743965, dtype=float64)
-
-cs_history = get_v_out_jitted(q_sum_hhhistory , p_l0, q_l0, fc_l0, Z_1417)
-#cs0_filtered = cs_0[(cs_0 > -0.5*1e9) ]
-cs_agg_history = nansum_ignore_nan_inf_jitted(cs_history)/12
-#Array(-1.12813803e+17, dtype=float64)
-cs_0 = get_v_out_jitted(q_sum_hh0, p_l0, q_l0, fc_l0, Z_current)
-cs_agg_0= nansum_ignore_nan_inf_jitted(cs_0)/12
-#Array(-4.34379253e+17, dtype=float64)
-
-# Combine the arrays into a pandas DataFrame
-detail_0 = pd.DataFrame({
-    'r0': r0,
-    'q_sum_hh0': q_sum_hh0/100,
-    'cs_0': cs_0
-})
-
-# Export the DataFrame to a CSV file
-detail_0.to_csv('ramsey_welfare_result/cs_detail_results/detail_0.csv', index=False)
-
-# Combine the arrays into a pandas DataFrame
-detail_history = pd.DataFrame({
-    'rhistory': rhistory,
-    'q_sum_hhhistory': q_sum_hhhistory/100,
-    'cs_history': cs_history
-})
-
-# Export the DataFrame to a CSV file
-detail_history.to_csv('ramsey_welfare_result/cs_detail_results/detail_history.csv', index=False)
 
 '''
 q_sum_hh_low = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z_low)
@@ -2179,6 +2266,14 @@ q_step_results = []
 r_step_results = []
 error_log = []  # Store errors
 
+param0_high = jnp.array([3, 8, 8, 8, 8, 
+                    2, 
+                    6-2, 11-6, 20-11,
+                    8.5, 
+                    10, 10, 10
+                    , 10
+                    ])
+
 Z_current_duplicate = jnp.repeat(Z_current, repeats=4, axis=1)
 
 for step in steps:
@@ -2355,49 +2450,49 @@ for step in steps:
 pl_step_agg_results = jnp.array(pl_step_agg_results)
 pl_step_agg_results  = pl_step_agg_results.T
 pl_step_agg_results_df = pd.DataFrame(pl_step_agg_results)
-pl_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/current_info_gamma05_bound_mean_pl.csv", index=False)
+pl_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/current_info_avg_bound_mean_pl.csv", index=False)
 del pl_step_agg_results, pl_step_agg_results_df
 
 ql_step_agg_results = jnp.array(ql_step_agg_results)
 ql_step_agg_results  = ql_step_agg_results.T
 ql_step_agg_results_df = pd.DataFrame(ql_step_agg_results)
-ql_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/current_info_gamma05_bound_mean_ql.csv", index=False)
+ql_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/current_info_avg_bound_mean_ql.csv", index=False)
 del ql_step_agg_results, ql_step_agg_results_df
 
 fcl_step_agg_results = jnp.array(fcl_step_agg_results)
 fcl_step_agg_results  = fcl_step_agg_results.T
 fcl_step_agg_results_df = pd.DataFrame(fcl_step_agg_results)
-fcl_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/current_info_gamma05_bound_mean_fcl.csv", index=False)
+fcl_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/current_info_avg_bound_mean_fcl.csv", index=False)
 del fcl_step_agg_results, fcl_step_agg_results_df
 
 r_step_agg_results = jnp.array(r_step_agg_results)
 r_step_agg_results_df = pd.DataFrame(r_step_agg_results)
-r_step_agg_results_df.to_csv("ramsey_welfare_result/current_info_gamma05_bound_mean_r.csv", index=False)
+r_step_agg_results_df.to_csv("ramsey_welfare_result/current_info_avg_bound_mean_r.csv", index=False)
 
 cs_step_agg_results = jnp.array(cs_step_agg_results)
 cs_step_agg_results_df = pd.DataFrame(cs_step_agg_results)
-cs_step_agg_results_df.to_csv("ramsey_welfare_result/current_info_gamma05_bound_mean_cs.csv", index=False)
+cs_step_agg_results_df.to_csv("ramsey_welfare_result/current_info_avg_bound_mean_cs.csv", index=False)
 
 q_step_agg_results = jnp.array(q_step_agg_results)
 q_step_agg_results_df = pd.DataFrame(q_step_agg_results)
-q_step_agg_results_df.to_csv("ramsey_welfare_result/current_info_gamma05_bound_mean_q.csv", index=False)
+q_step_agg_results_df.to_csv("ramsey_welfare_result/current_info_avg_bound_mean_q.csv", index=False)
 
 cs_step_results = jnp.array(cs_step_results)
 cs_step_results=cs_step_results.T
 cs_step_results_df = pd.DataFrame(cs_step_results)
-cs_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/current_info_gamma05_bound_mean_cs_steps.csv", index=False)
+cs_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/current_info_avg_bound_mean_cs_steps.csv", index=False)
 del cs_step_results, cs_step_results_df
 
 q_step_results = jnp.array(q_step_results)
 q_step_results=q_step_results.T
 q_step_results_df = pd.DataFrame(q_step_results)
-q_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/current_info_gamma05_bound_mean_q_steps.csv", index=False)
+q_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/current_info_avg_bound_mean_q_steps.csv", index=False)
 del q_step_results, q_step_results_df
 
 r_step_results = jnp.array(r_step_results)
 r_step_results=r_step_results.T
 r_step_results_df = pd.DataFrame(r_step_results)
-r_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/current_info_gamma05_bound_mean_r_steps.csv", index=False)
+r_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/current_info_avg_bound_mean_r_steps.csv", index=False)
 del r_step_results, r_step_results_df
 
 #######################################
@@ -2487,6 +2582,39 @@ q_step_results_iqr = []
 r_step_results_iqr = []
 error_log_var = []
 
+param0_low = jnp.array([3, 3, 3, 3, 3, 
+                    2, 
+                    6-2, 11-6, 20-11,
+                    8.5, 
+                    7,7,7,7
+                    ])
+
+param0_high = jnp.array([3, 4, 4, 4, 4, 
+                    2, 
+                    6-2, 11-6, 20-11,
+                    8.5, 
+                    7.125,7.125,7.125,7.125
+                    ])
+
+
+def get_initial_param_for_step(step, param_high, param_low):
+    """
+    Determines the initial parameter value based on the step according to specified ranges.
+    """
+    # Use a small tolerance for floating point comparisons
+    tolerance = 1e-9
+
+    if abs(step - 0.75) < tolerance or (step >= 1.1 - tolerance and step <= 1.25 + tolerance):
+        print(f"Step {step}: Using param_high as initial guess.")
+        return param_high
+    else:
+        print(f"Step {step}: Using param0_low (default) as initial guess.")
+        return param_low
+    
+get_initial_param_for_step_jitted = jax.jit(get_initial_param_for_step)
+
+
+
 for step in s_steps:
     try:
         # Update Z_step with the current step
@@ -2505,8 +2633,10 @@ for step in s_steps:
             0.0, jnp.inf, jac='2-point', hess=BFGS()
         )
         
-        ### Initial value is param0_high
-        param0_high_np = np.array(param0_high)
+        ### Determine the initial value based on the current step
+        # Call the function to get the initial parameter for this step
+        initial_param_for_step = get_initial_param_for_step(step, param0_high, param0_low)
+        param0_high_np = np.array(initial_param_for_step, dtype=float) # Ensure NumPy conversion
 
         # First optimization attempt
         solution1_nobd = cobyqa.minimize(
@@ -2605,49 +2735,49 @@ np.savetxt("ramsey_welfare_result/cs_detail_results/cs_r_q_gamma05_115.csv", cs_
 pl_step_agg_results_iqr = jnp.array(pl_step_agg_results_iqr)
 pl_step_agg_results_iqr  = pl_step_agg_results_iqr.T
 pl_step_agg_results_iqr_df = pd.DataFrame(pl_step_agg_results_iqr)
-pl_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/current_info_gamma05_bound_var_pl.csv", index=False)
+pl_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/current_info_avg_bound_var_pl.csv", index=False)
 del pl_step_agg_results_iqr, pl_step_agg_results_iqr_df
 
 ql_step_agg_results_iqr = jnp.array(ql_step_agg_results_iqr)
 ql_step_agg_results_iqr  = ql_step_agg_results_iqr.T
 ql_step_agg_results_iqr_df = pd.DataFrame(ql_step_agg_results_iqr)
-ql_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/current_info_gamma05_bound_var_ql.csv", index=False)
+ql_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/current_info_avg_bound_var_ql.csv", index=False)
 del ql_step_agg_results_iqr, ql_step_agg_results_iqr_df
 
 fcl_step_agg_results_iqr = jnp.array(fcl_step_agg_results_iqr)
 fcl_step_agg_results_iqr  = fcl_step_agg_results_iqr.T
 fcl_step_agg_results_iqr_df = pd.DataFrame(fcl_step_agg_results_iqr)
-fcl_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/current_info_gamma05_bound_var_fcl.csv", index=False)
+fcl_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/current_info_avg_bound_var_fcl.csv", index=False)
 del fcl_step_agg_results_iqr, fcl_step_agg_results_iqr_df
 
 r_step_agg_results_iqr = jnp.array(r_step_agg_results_iqr)
 r_step_agg_results_iqr_df = pd.DataFrame(r_step_agg_results_iqr)
-r_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/current_info_gamma05_bound_var_r.csv", index=False)
+r_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/current_info_avg_bound_var_r.csv", index=False)
 
 cs_step_agg_results_iqr = jnp.array(cs_step_agg_results_iqr)
 cs_step_agg_results_iqr_df = pd.DataFrame(cs_step_agg_results_iqr)
-cs_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/current_info_gamma05_bound_var_cs.csv", index=False)
+cs_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/current_info_avg_bound_var_cs.csv", index=False)
 
 q_step_agg_results_iqr = jnp.array(q_step_agg_results_iqr)
 q_step_agg_results_iqr_df = pd.DataFrame(q_step_agg_results_iqr)
-q_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/current_info_gamma05_bound_var_q.csv", index=False)
+q_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/current_info_avg_bound_var_q.csv", index=False)
 
 cs_step_results_iqr = jnp.array(cs_step_results_iqr)
 cs_step_results_iqr=cs_step_results_iqr.T
 cs_step_results_iqr_df = pd.DataFrame(cs_step_results_iqr)
-cs_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/current_info_gamma05_bound_var_cs_steps.csv", index=False)
+cs_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/current_info_avg_bound_var_cs_steps.csv", index=False)
 del cs_step_results_iqr, cs_step_results_iqr_df
 
 q_step_results_iqr = jnp.array(q_step_results_iqr)
 q_step_results_iqr=q_step_results_iqr.T
 q_step_results_iqr_df = pd.DataFrame(q_step_results_iqr)
-q_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/current_info_gamma05_bound_var_q_steps.csv", index=False)
+q_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/current_info_avg_bound_var_q_steps.csv", index=False)
 del q_step_results_iqr, q_step_results_iqr_df
 
 r_step_results_iqr = jnp.array(r_step_results_iqr)
 r_step_results_iqr=r_step_results_iqr.T
 r_step_results_iqr_df = pd.DataFrame(r_step_results_iqr)
-r_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/current_info_gamma05_bound_var_r_steps.csv", index=False)
+r_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/current_info_avg_bound_var_r_steps.csv", index=False)
 del r_step_results_iqr, r_step_results_iqr_df
 
 # Convert results to DataFrame
@@ -2669,8 +2799,492 @@ results_df['var_q_diff'] = (results_df['var_q'] -q_agg_0)/q_agg_0
 results_df['mean_cs_diff'] = (results_df['mean_cs'] -cs_agg_0)/np.absolute(cs_agg_0)
 results_df['var_cs_diff'] = (results_df['var_cs'] -cs_agg_0)/np.absolute(cs_agg_0)
 
-results_df.to_csv("ramsey_welfare_result/current_info_gamma05_bound_result.csv", index=False)
+results_df.to_csv("ramsey_welfare_result/current_info_avg_bound_result.csv", index=False)
 
+########################################
+###### CRRA Function ##########
+########################################
+
+steps = jnp.arange(-0.25, 0.3, 0.05)
+
+#s_steps = jnp.arange(-0.05,0.35-0.025 , 0.025)
+
+# Lists to store results
+pl_step_agg_results = []
+ql_step_agg_results = []
+fcl_step_agg_results = []
+r_step_agg_results = []
+cs_step_agg_results = []
+q_step_agg_results = []
+cs_step_results = []
+q_step_results = []
+r_step_results = []
+error_log = []  # Store errors
+
+param0_high = jnp.array([3, 7, 7, 7, 7, 
+                    2, 
+                    6-2, 11-6, 20-11,
+                    8, 
+                    18, 18, 18
+                    , 18
+                    ])
+
+Z_current_duplicate = jnp.repeat(Z_current, repeats=4, axis=1)
+
+for step in steps:
+    try:
+        # Update Z_step with the current step
+        Z_step = Z_current_duplicate.copy()  # Preserve original structure
+        #Z_step = Z_history.copy()  # Preserve original structure
+        Z_step = Z_step.at[:, 8:12].add(step)  # Modify slice (columns 8 to 11)
+        Z_step = jnp.maximum(Z_step, 1e-16)
+
+        # Define constraints
+        constraint_conserve = NonlinearConstraint(
+            lambda x: conservation_constraint_jitted(x, Z_step), 
+            0.95, 1.0, jac='2-point', hess=BFGS()
+        )
+        constraint_revenue = NonlinearConstraint(
+            lambda x: revenue_lower_bound_crra_constraint_jitted(x, Z_step), 
+            0.0, jnp.inf, jac='2-point', hess=BFGS()
+        )
+        
+        ### Initial value is param0_high
+        param0_high_np = np.array(param0_high)
+
+        # First optimization attempt
+        solution1_nobd = cobyqa.minimize(
+            lambda x: objective0(x, Z_step), 
+            param0_high_np,
+            bounds=bounds0, 
+            constraints=(constraint_conserve, constraint_revenue), 
+            options={'disp': True, 'feasibility_tol': 1e-6, 'radius_init': 0.5, 'radius_final': 0.05}
+        )
+
+        solution1_nobd.x = np.array(solution1_nobd.x)
+
+        # Retry if optimization did not converge
+        if not solution1_nobd.success:
+            print(f"Step {step}: First attempt did not converge. Retrying with new initial guess.")
+            solution1_nobd_2 = cobyqa.minimize(
+                lambda x: objective0(x, Z_step), 
+                np.array(solution1_nobd.x, dtype=float),  # Ensure NumPy conversion
+                bounds=bounds0, 
+                constraints=(constraint_conserve, constraint_revenue), 
+                options={'disp': True, 'feasibility_tol': 1e-6, 'radius_init': 0.5, 'radius_final': 0.05}
+            )
+            solution1_nobd_final = solution1_nobd_2
+        else:
+            print(f"Step {step}: Optimization converged successfully.")
+            solution1_nobd_final = solution1_nobd
+
+        # **Check for Constraint Violations**
+        conserve_value = conservation_constraint_jitted(solution1_nobd_final.x, Z_step)
+        revenue_value = revenue_lower_bound_crra_constraint_jitted(solution1_nobd_final.x, Z_step)
+
+        if conserve_value < 0.95 or conserve_value > 1.0:
+            raise ValueError(f"Step {step}: Conservation constraint violated! Value: {conserve_value}")
+
+        if revenue_value < 0.0:
+            raise ValueError(f"Step {step}: Revenue constraint violated! Value: {revenue_value}")
+
+        # Compute optimal price and quantities
+        p_l, q_l, fc_l = param_to_pq0_jitted(solution1_nobd_final.x)
+
+        # Process constraints
+        processed_Z = average_Z_jitted(Z_step)
+        q_sum_hh_step = get_q_sum_hh_jitted(p_l, q_l, fc_l, processed_Z)
+        r_step = from_q_to_r_jitted(q_sum_hh_step, p_l, q_l, fc_l)
+        r_step_agg = nansum_ignore_nan_inf_jitted(r_step) / 12
+        cs_step = get_v_out_jitted(q_sum_hh_step, p_l, q_l, fc_l, processed_Z)
+        cs_step_agg = nansum_ignore_nan_inf_jitted(cs_step) / 12
+        q_hh_step = q_sum_hh_step/sim
+        q_step_agg = nansum_ignore_nan_inf_jitted(q_hh_step) / 12
+
+        # Append results
+        pl_step_agg_results.append(p_l)
+        ql_step_agg_results.append(q_l)
+        fcl_step_agg_results.append(fc_l)
+        r_step_agg_results.append(r_step_agg)
+        cs_step_agg_results.append(cs_step_agg)
+        q_step_agg_results.append(q_step_agg)
+        cs_step_results.append(cs_step)
+        q_step_results.append(q_hh_step)
+        r_step_results.append(r_step)
+
+        # Clean up memory
+        del q_sum_hh_step, r_step, cs_step, q_hh_step
+        gc.collect()
+
+    except ValueError as e:
+        error_log.append(str(e))  # Store error message
+        print(f"Error at step {step}: {e}")  # Optional: Print errors immediately
+
+# **Print all errors after the loop**
+if error_log:
+    print("\nErrors encountered during optimization:")
+    for err in error_log:
+        print(err)
+
+
+
+"""
+for step in steps:
+    # Update Z_step with the current step
+    Z_step = Z_history.copy()  # Make a copy of Z_history to preserve its original structure
+    Z_step = Z_step.at[:, 8:12].add(step)  # Modify the selected slice (columns 8 to 11) by adding `step`
+    Z_step = jnp.maximum(Z_step, 1e-16)
+    
+    constraint_conserve = NonlinearConstraint(
+        lambda x: conservation_constraint_jitted(x, Z_step ), 
+        0.95, 1.0, jac='2-point', hess=BFGS()
+    )
+    constraint_revenue = NonlinearConstraint(
+        lambda x: revenue_lower_bound_constraint_jitted(x, Z_step ), 
+        0.0, jnp.inf, jac='2-point', hess=BFGS()
+    )
+
+    #param0_2 = param0_2.astype(float)
+    param0_2_np = np.array(param0_2)
+
+    solution1_nobd = cobyqa.minimize(
+        lambda x: objective0(x, Z_step ), 
+        param0_2_np,
+        bounds=bounds0, 
+        constraints=(constraint_conserve, constraint_revenue), 
+        options={'disp': True, 'feasibility_tol': 1e-9,'radius_init': 0.1, 'radius_final': 0.01}
+    )
+
+     #Check convergence and retry if necessary
+    solution1_nobd.x = np.array(solution1_nobd.x)
+    if not solution1_nobd.success:
+        print("First attempt did not converge. Retrying with new initial guess.")
+        solution1_nobd_2 = cobyqa.minimize(
+            lambda x: objective0(x, Z_step ), 
+            np.array(solution1_nobd.x, dtype=float),  # Ensure NumPy conversion
+            bounds=bounds0, 
+            constraints=(constraint_conserve, constraint_revenue), 
+            options={'disp': True, 'feasibility_tol': 1e-9,'radius_init': 0.1, 'radius_final': 0.01}
+        )
+        solution1_nobd_final = solution1_nobd_2
+    else:
+        print("Optimization converged successfully.")
+        solution1_nobd_final = solution1_nobd
+
+    #solution1_nobd_final = solution1_nobd 
+    p_l, q_l, fc_l = param_to_pq0_jitted(solution1_nobd_final.x)
+    ## Compute optimal price
+    #p_l, q_l, fc_l = loop_Z_get_price(Z_step)
+    # Compute quantities
+    ### Use Average at first
+    processed_Z = average_Z_jitted(Z_step)
+    q_sum_hh_step = get_q_sum_hh_jitted(p_l, q_l, fc_l, processed_Z)
+    r_step = from_q_to_r_jitted(q_sum_hh_step, p_l, q_l, fc_l)
+    #r_step_filtered =r_step[r_step < 20000]
+    #r_step = r_step * (r_step < 20000)
+    #r_step_agg = sum_ignore_outliers_jitted(r_step) / 12
+    r_step_agg = nansum_ignore_nan_inf_jitted(r_step) / 12
+    cs_step = get_v_out_jitted(q_sum_hh_step, p_l, q_l, fc_l, processed_Z)
+    #cs_step_filtered = cs_step[cs_step > -0.5 * 1e9]
+    #cs_step = cs_step * (cs_step > -0.5 * 1e9)
+    #cs_step_agg = sum_ignore_outliers_jitted(cs_step) / 12
+    cs_step_agg = nansum_ignore_nan_inf_jitted(cs_step) / 12
+    del q_sum_hh_step, r_step
+    
+    # Append results
+    pl_step_agg_results.append(p_l)
+    ql_step_agg_results.append(q_l)
+    fcl_step_agg_results.append(fc_l)
+    r_step_agg_results.append(r_step_agg)
+    cs_step_agg_results.append(cs_step_agg)
+    cs_step_results.append(cs_step)
+    del cs_step
+    gc.collect()
+"""
+# Convert results to arrays for further processing
+pl_step_agg_results = jnp.array(pl_step_agg_results)
+pl_step_agg_results  = pl_step_agg_results.T
+pl_step_agg_results_df = pd.DataFrame(pl_step_agg_results)
+pl_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/current_info_gamma1_bound_mean_pl.csv", index=False)
+del pl_step_agg_results, pl_step_agg_results_df
+
+ql_step_agg_results = jnp.array(ql_step_agg_results)
+ql_step_agg_results  = ql_step_agg_results.T
+ql_step_agg_results_df = pd.DataFrame(ql_step_agg_results)
+ql_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/current_info_gamma1_bound_mean_ql.csv", index=False)
+del ql_step_agg_results, ql_step_agg_results_df
+
+fcl_step_agg_results = jnp.array(fcl_step_agg_results)
+fcl_step_agg_results  = fcl_step_agg_results.T
+fcl_step_agg_results_df = pd.DataFrame(fcl_step_agg_results)
+fcl_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/current_info_gamma1_bound_mean_fcl.csv", index=False)
+del fcl_step_agg_results, fcl_step_agg_results_df
+
+r_step_agg_results = jnp.array(r_step_agg_results)
+r_step_agg_results_df = pd.DataFrame(r_step_agg_results)
+r_step_agg_results_df.to_csv("ramsey_welfare_result/current_info_gamma1_bound_mean_r.csv", index=False)
+
+cs_step_agg_results = jnp.array(cs_step_agg_results)
+cs_step_agg_results_df = pd.DataFrame(cs_step_agg_results)
+cs_step_agg_results_df.to_csv("ramsey_welfare_result/current_info_gamma1_bound_mean_cs.csv", index=False)
+
+q_step_agg_results = jnp.array(q_step_agg_results)
+q_step_agg_results_df = pd.DataFrame(q_step_agg_results)
+q_step_agg_results_df.to_csv("ramsey_welfare_result/current_info_gamma1_bound_mean_q.csv", index=False)
+
+cs_step_results = jnp.array(cs_step_results)
+cs_step_results=cs_step_results.T
+cs_step_results_df = pd.DataFrame(cs_step_results)
+cs_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/current_info_gamma1_bound_mean_cs_steps.csv", index=False)
+del cs_step_results, cs_step_results_df
+
+q_step_results = jnp.array(q_step_results)
+q_step_results=q_step_results.T
+q_step_results_df = pd.DataFrame(q_step_results)
+q_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/current_info_gamma1_bound_mean_q_steps.csv", index=False)
+del q_step_results, q_step_results_df
+
+r_step_results = jnp.array(r_step_results)
+r_step_results=r_step_results.T
+r_step_results_df = pd.DataFrame(r_step_results)
+r_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/current_info_gamma1_bound_mean_r_steps.csv", index=False)
+del r_step_results, r_step_results_df
+
+#######################################
+#### Prepare Z for changing IQR ######
+######################################
+
+#### noted that the iqr in the demand model is iqr within month. This is not the focus of the research
+#### The research focus on the volatility across different month both within a year
+
+
+
+s_steps = jnp.arange(0.75, 1.25+0.05, 0.05)
+
+param0_high = jnp.array([3, 4, 4, 4, 4, 
+                    2, 
+                    6-2, 11-6, 20-11,
+                    8.5,
+                    7, 7, 7, 7,
+                    ])
+
+param0_low = jnp.array([3, 3.5, 3.5, 3.5, 3.5, 
+                    2, 
+                    6-2, 11-6, 20-11,
+                    8.5,
+                    7, 7, 7, 7,
+                    ])
+
+def get_initial_param_for_step(step, param_high, param_low):
+    """
+    Determines the initial parameter value based on the step according to specified ranges.
+    """
+    # Use a small tolerance for floating point comparisons
+    tolerance = 1e-9
+
+    if step <= 1.2 + tolerance:
+        print(f"Step {step}: Using param_med as initial guess.")
+        return param_low
+    else:
+        print(f"Step {step}: Using param0_high (default) as initial guess.")
+        return param_high
+    
+get_initial_param_for_step_jitted = jax.jit(get_initial_param_for_step)
+
+pl_step_agg_results_iqr = []
+ql_step_agg_results_iqr = []
+fcl_step_agg_results_iqr = []
+r_step_agg_results_iqr = []
+cs_step_agg_results_iqr = []
+q_step_agg_results_iqr = []
+cs_step_results_iqr = []
+q_step_results_iqr = []
+r_step_results_iqr = []
+error_log_var = []
+
+for step in s_steps:
+    try:
+        # Update Z_step with the current step
+        #Z_step = Z_history.copy()  # Preserve original structure
+        Z_step = Z_current_duplicate.copy()  # Preserve original structure
+        Z_step = Z_step.at[:, 8:12].set(scale_sd_jitted(Z_step[:, 8:12], step))
+        Z_step = jnp.maximum(Z_step, 1e-16)
+
+        # Define constraints
+        constraint_conserve = NonlinearConstraint(
+            lambda x: conservation_constraint_jitted(x, Z_step), 
+            0.95, 1.0, jac='2-point', hess=BFGS()
+        )
+        constraint_revenue = NonlinearConstraint(
+            lambda x: revenue_lower_bound_crra_constraint_jitted(x, Z_step), 
+            0.0, jnp.inf, jac='2-point', hess=BFGS()
+        )
+        
+        initial_param_for_step = get_initial_param_for_step(step, param0_high, param0_low)
+        param0_high_np = np.array(initial_param_for_step, dtype=float) # Ensure NumPy conversion
+
+        # First optimization attempt
+        solution1_nobd = cobyqa.minimize(
+            lambda x: objective0(x, Z_step), 
+            param0_high_np,
+            bounds=bounds0, 
+            constraints=(constraint_conserve, constraint_revenue), 
+            options={'disp': True, 'feasibility_tol': 1e-6, 'radius_init': 0.5, 'radius_final': 0.05}
+        )
+
+        solution1_nobd.x = np.array(solution1_nobd.x)
+
+        # Retry if optimization did not converge
+        if not solution1_nobd.success:
+            print(f"Step {step}: First attempt did not converge. Retrying with new initial guess.")
+            solution1_nobd_2 = cobyqa.minimize(
+                lambda x: objective0(x, Z_step), 
+                np.array(solution1_nobd.x, dtype=float),  # Ensure NumPy conversion
+                bounds=bounds0, 
+                constraints=(constraint_conserve, constraint_revenue), 
+                options={'disp': True, 'feasibility_tol': 1e-6, 'radius_init': 0.5, 'radius_final': 0.05}
+            )
+            solution1_nobd_final = solution1_nobd_2
+        else:
+            print(f"Step {step}: Optimization converged successfully.")
+            solution1_nobd_final = solution1_nobd
+
+        # **Check for Constraint Violations**
+        conserve_value = conservation_constraint_jitted(solution1_nobd_final.x, Z_step)
+        revenue_value = revenue_lower_bound_crra_constraint_jitted(solution1_nobd_final.x, Z_step)
+
+        if conserve_value < 0.95 or conserve_value > 1.0:
+            raise ValueError(f"Step {step}: Conservation constraint violated! Value: {conserve_value}")
+
+        if revenue_value < 0.0:
+            raise ValueError(f"Step {step}: Revenue constraint violated! Value: {revenue_value}")
+
+        # Compute optimal price and quantities
+        p_l, q_l, fc_l = param_to_pq0_jitted(solution1_nobd_final.x)
+
+        # Process constraints
+        processed_Z = average_Z_jitted(Z_step)
+        q_sum_hh_step = get_q_sum_hh_jitted(p_l, q_l, fc_l, processed_Z)
+        r_step = from_q_to_r_jitted(q_sum_hh_step, p_l, q_l, fc_l)
+        r_step_agg = nansum_ignore_nan_inf_jitted(r_step) / 12
+        cs_step = get_v_out_jitted(q_sum_hh_step, p_l, q_l, fc_l, processed_Z)
+        cs_step_agg = nansum_ignore_nan_inf_jitted(cs_step) / 12
+        q_hh_step = q_sum_hh_step/sim
+        q_step_agg = nansum_ignore_nan_inf_jitted(q_hh_step) / 12
+
+        # Append results
+        pl_step_agg_results_iqr.append(p_l)
+        ql_step_agg_results_iqr.append(q_l)
+        fcl_step_agg_results_iqr.append(fc_l)
+        r_step_agg_results_iqr.append(r_step_agg)
+        cs_step_agg_results_iqr.append(cs_step_agg)
+        q_step_agg_results_iqr.append(q_step_agg)
+        cs_step_results_iqr.append(cs_step)
+        q_step_results_iqr.append(q_hh_step)
+        r_step_results_iqr.append(r_step)
+
+        # Clean up memory
+        del q_sum_hh_step, r_step, cs_step, q_hh_step
+        gc.collect()
+
+    except ValueError as e:
+        error_log_var.append(str(e))  # Store error message
+        print(f"Error at step {step}: {e}")  # Optional: Print errors immediately
+
+# **Print all errors after the loop**
+if error_log_var:
+    print("\nErrors encountered during optimization:")
+    for err in error_log_var:
+        print(err)
+        
+"""
+p_l
+q_l
+fc_l
+cs_step_agg
+q_step_agg
+r_step_agg
+(cs_step_agg - cs_agg_0)/abs(cs_agg_0)
+(q_step_agg - q_agg_0)/abs(q_agg_0)
+(r_step_agg - r_agg_0)/abs(r_agg_0)
+
+cs_r_q = jnp.column_stack((cs_step, r_step, q_hh_step))
+# Convert to NumPy
+cs_r_q = np.array(cs_r_q)
+
+# Export to CSV
+np.savetxt("ramsey_welfare_result/cs_detail_results/cs_r_q_gamma1_115.csv", cs_r_q, delimiter=",", fmt="%.5f")
+"""        
+
+# Convert results to arrays for further processing
+pl_step_agg_results_iqr = jnp.array(pl_step_agg_results_iqr)
+pl_step_agg_results_iqr  = pl_step_agg_results_iqr.T
+pl_step_agg_results_iqr_df = pd.DataFrame(pl_step_agg_results_iqr)
+pl_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/current_info_gamma1_bound_var_pl.csv", index=False)
+del pl_step_agg_results_iqr, pl_step_agg_results_iqr_df
+
+ql_step_agg_results_iqr = jnp.array(ql_step_agg_results_iqr)
+ql_step_agg_results_iqr  = ql_step_agg_results_iqr.T
+ql_step_agg_results_iqr_df = pd.DataFrame(ql_step_agg_results_iqr)
+ql_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/current_info_gamma1_bound_var_ql.csv", index=False)
+del ql_step_agg_results_iqr, ql_step_agg_results_iqr_df
+
+fcl_step_agg_results_iqr = jnp.array(fcl_step_agg_results_iqr)
+fcl_step_agg_results_iqr  = fcl_step_agg_results_iqr.T
+fcl_step_agg_results_iqr_df = pd.DataFrame(fcl_step_agg_results_iqr)
+fcl_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/current_info_gamma1_bound_var_fcl.csv", index=False)
+del fcl_step_agg_results_iqr, fcl_step_agg_results_iqr_df
+
+r_step_agg_results_iqr = jnp.array(r_step_agg_results_iqr)
+r_step_agg_results_iqr_df = pd.DataFrame(r_step_agg_results_iqr)
+r_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/current_info_gamma1_bound_var_r.csv", index=False)
+
+cs_step_agg_results_iqr = jnp.array(cs_step_agg_results_iqr)
+cs_step_agg_results_iqr_df = pd.DataFrame(cs_step_agg_results_iqr)
+cs_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/current_info_gamma1_bound_var_cs.csv", index=False)
+
+q_step_agg_results_iqr = jnp.array(q_step_agg_results_iqr)
+q_step_agg_results_iqr_df = pd.DataFrame(q_step_agg_results_iqr)
+q_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/current_info_gamma1_bound_var_q.csv", index=False)
+
+cs_step_results_iqr = jnp.array(cs_step_results_iqr)
+cs_step_results_iqr=cs_step_results_iqr.T
+cs_step_results_iqr_df = pd.DataFrame(cs_step_results_iqr)
+cs_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/current_info_gamma1_bound_var_cs_steps.csv", index=False)
+del cs_step_results_iqr, cs_step_results_iqr_df
+
+q_step_results_iqr = jnp.array(q_step_results_iqr)
+q_step_results_iqr=q_step_results_iqr.T
+q_step_results_iqr_df = pd.DataFrame(q_step_results_iqr)
+q_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/current_info_gamma1_bound_var_q_steps.csv", index=False)
+del q_step_results_iqr, q_step_results_iqr_df
+
+r_step_results_iqr = jnp.array(r_step_results_iqr)
+r_step_results_iqr=r_step_results_iqr.T
+r_step_results_iqr_df = pd.DataFrame(r_step_results_iqr)
+r_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/current_info_gamma1_bound_var_r_steps.csv", index=False)
+del r_step_results_iqr, r_step_results_iqr_df
+
+# Convert results to DataFrame
+results_df = pd.DataFrame({
+    "steps": steps,
+    "s_steps": s_steps,
+    "mean_r": r_step_agg_results,
+    "mean_cs": cs_step_agg_results,
+    "mean_q": q_step_agg_results,
+    "var_r": r_step_agg_results_iqr,
+    "var_cs": cs_step_agg_results_iqr,
+    "var_q": q_step_agg_results_iqr,
+})
+
+results_df['mean_r_diff'] = (results_df['mean_r'] -r_agg_0)/r_agg_0
+results_df['var_r_diff'] = (results_df['var_r'] -r_agg_0)/r_agg_0
+results_df['mean_q_diff'] = (results_df['mean_q'] -q_agg_0)/q_agg_0
+results_df['var_q_diff'] = (results_df['var_q'] -q_agg_0)/q_agg_0
+results_df['mean_cs_diff'] = (results_df['mean_cs'] -cs_agg_0)/np.absolute(cs_agg_0)
+results_df['var_cs_diff'] = (results_df['var_cs'] -cs_agg_0)/np.absolute(cs_agg_0)
+
+results_df.to_csv("ramsey_welfare_result/current_info_gamma1_bound_result.csv", index=False)
 
 #### Save Price Results
 '''
