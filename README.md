@@ -51,7 +51,7 @@ Due to privacy constraints, raw data are not publicly included.
 
 ## 📝 License
 
-BSD 3-Clause License
+This project is licensed under the GNU General Public License v3.0 – see the [LICENSE](LICENSE) file for details.
 
 
 ---
