@@ -51,7 +51,7 @@ Due to privacy constraints, raw data are not publicly included.
 
 ## 📝 License
 
-All rights reserved. No part of this work may be reproduced, distributed, or used in any form without written permission from the author.
+BSD 3-Clause License
 
 
 ---
