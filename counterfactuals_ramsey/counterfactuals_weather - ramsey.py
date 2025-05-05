@@ -538,7 +538,173 @@ nu_array = np.random.normal(loc = 0, scale = sigma_nu, size = shape)
 eta_l = jnp.array(demand_2018_using_eta['e_diff'])
 
 bedroom = jnp.array(demand_2018_using_new['bedroom'])
+bathroom = jnp.array(demand_2018_using_new['bathroom'])
 prev_NDVI = jnp.array(demand_2018_using_new['prev_NDVI'])
+heavy_water_app = jnp.array(demand_2018_using_new['heavy_water_app'])
+
+Z_current_using = jnp.column_stack((jnp.array(demand_2018_using_new['mean_TMAX_1']),
+                                      jnp.array(demand_2018_using_new['IQR_TMAX_1']),
+                                      jnp.array(demand_2018_using_new['total_PRCP']) 
+                                      ,jnp.array(demand_2018_using_new['IQR_PRCP'])
+                                      ))
+Z_current = Z_current_using
+
+
+
+weather_history = pd.read_csv('weather/weather_history.csv')
+
+weather_history_season = pd.read_csv('weather/weather_history_season.csv')
+
+#demand_2018_using_new = pd.merge(demand_2018_using_new, weather_history, on='bill_ym', how='left' )
+
+weather = pd.merge(weather_history, weather_history_season, on='bill_ym', how='left' )
+
+weather_all_history = pd.read_csv('weather/weather_allhistory_1417.csv')
+
+demand_2018_using_new_season = pd.merge(demand_2018_using_new, weather_history_season, on='bill_ym', how='left' )
+
+demand_2018_using_new_season = pd.merge(demand_2018_using_new_season,weather_all_history , on='bill_ym', how='left' )
+
+#Z_current_outdoor_using = jnp.column_stack((jnp.array(demand_2018_using_new['mean_Tmax_history']),
+ #                                     jnp.array(demand_2018_using_new['IQR_Tmax_history']),
+  #                                    jnp.array(demand_2018_using_new['sum_Prcp_history']) 
+   #                                   ,jnp.array(demand_2018_using_new['IQR_Prcp_history'])))
+   
+   
+#Z_current_indoor_using = jnp.array(demand_2018_using_new['mean_Tmax_history'])
+#Z_current_indoor_using = Z_current_indoor_using[:, jnp.newaxis]
+'''
+Z_low = jnp.column_stack((jnp.array(demand_2018_using_new_season['mean_Tmax_history']),
+                                      jnp.array(demand_2018_using_new_season['IQR_Tmax_history']),
+                                      jnp.array(demand_2018_using_new_season['sum_Prcp_low']) 
+                                      ,jnp.array(demand_2018_using_new_season['IQR_Prcp_low'])))
+
+Z_high = jnp.column_stack((jnp.array(demand_2018_using_new_season['mean_Tmax_history']),
+                                      jnp.array(demand_2018_using_new_season['IQR_Tmax_history']),
+                                      jnp.array(demand_2018_using_new_season['sum_Prcp_high']) 
+                                      ,jnp.array(demand_2018_using_new_season['IQR_Prcp_high'])))
+
+Z_extreme_min = jnp.column_stack((jnp.array(demand_2018_using_new_season['mean_Tmax_history']),
+                                      jnp.array(demand_2018_using_new_season['IQR_Tmax_history']),
+                                      jnp.array(demand_2018_using_new_season['sum_Prcp_extreme_min']) 
+                                      ,jnp.array(demand_2018_using_new_season['IQR_Prcp_extreme_min'])))
+
+Z_extreme_max = jnp.column_stack((jnp.array(demand_2018_using_new_season['mean_Tmax_history']),
+                                      jnp.array(demand_2018_using_new_season['IQR_Tmax_history']),
+                                      jnp.array(demand_2018_using_new_season['sum_Prcp_extreme_max']) 
+                                      ,jnp.array(demand_2018_using_new_season['IQR_Prcp_extreme_max'])))
+
+Z_history = jnp.column_stack((jnp.array(demand_2018_using_new_season['mean_Tmax_history']),
+                                      jnp.array(demand_2018_using_new_season['IQR_Tmax_history']),
+                                      jnp.array(demand_2018_using_new_season['sum_Prcp_history']) 
+                                      ,jnp.array(demand_2018_using_new_season['IQR_Prcp_history'])))
+
+Z_zero = jnp.zeros_like(Z_history)
+'''
+
+#log_q0 = cf_w_jitted(p_l0, q_l0, fc_l0, Z_current)
+
+##########################################
+#### Calculate Changing NDVI with Z #####
+###########################################
+
+ndvi_df = demand_2018_using_new_season[['prem_id', 'bill_ym', 'prev_NDVI', 'mean_TMAX_1', 'IQR_TMAX_1', 'total_PRCP', 'IQR_PRCP', 'income', 'quantity']]
+ndvi_df['NDVI'] = ndvi_df .groupby('prem_id')['prev_NDVI'].shift(-1)
+import statsmodels.formula.api as smf
+
+formula = 'NDVI ~ mean_TMAX_1 + IQR_TMAX_1 + total_PRCP + IQR_PRCP + income'
+
+# Fit the OLS (Ordinary Least Squares) model
+model = smf.ols(formula, data=ndvi_df)
+
+# Get the regression results
+results = model.fit()
+
+# Print the regression summary
+print("\nLinear Regression Results:")
+print(results.summary())
+
+#Linear Regression Results:
+#                            OLS Regression Results                            
+#==============================================================================
+#Dep. Variable:                   NDVI   R-squared:                       0.127
+#Model:                            OLS   Adj. R-squared:                  0.127
+#Method:                 Least Squares   F-statistic:                 3.935e+04
+#Date:                Mon, 05 May 2025   Prob (F-statistic):               0.00
+#Time:                        11:17:28   Log-Likelihood:             1.1813e+06
+#No. Observations:             1356924   AIC:                        -2.363e+06
+#Df Residuals:                 1356918   BIC:                        -2.363e+06
+#Df Model:                           5                                         
+#Covariance Type:            nonrobust                                         
+#===============================================================================
+#                  coef    std err          t      P>|t|      [0.025      0.975]
+#-------------------------------------------------------------------------------
+#Intercept       0.1149      0.001     92.940      0.000       0.112       0.117
+#mean_TMAX_1     0.0030   1.16e-05    256.693      0.000       0.003       0.003
+#IQR_TMAX_1      0.0013    3.2e-05     40.768      0.000       0.001       0.001
+#total_PRCP      0.0080   4.49e-05    177.803      0.000       0.008       0.008
+#IQR_PRCP       -0.0118      0.000    -29.460      0.000      -0.013      -0.011
+#income       1.449e-07   1.26e-09    114.940      0.000    1.42e-07    1.47e-07
+#==============================================================================
+#Omnibus:                    23337.264   Durbin-Watson:                   0.543
+#Prob(Omnibus):                  0.000   Jarque-Bera (JB):            24581.074
+#Skew:                          -0.324   Prob(JB):                         0.00
+#Kurtosis:                       3.122   Cond. No.                     1.07e+06
+#==============================================================================
+
+#Notes:
+#[1] Standard Errors assume that the covariance matrix of the errors is correctly specified.
+#[2] The condition number is large, 1.07e+06. This might indicate that there are
+#strong multicollinearity or other numerical problems.
+
+beta_prcp = 0.008
+
+NDVI = demand_2018_using_new_season.groupby('prem_id')['prev_NDVI'].shift(-1)
+last_dec_NDVI = demand_2018_using_new_season.groupby('prem_id')['prev_NDVI'].transform('first')
+NDVI = jnp.array(NDVI.fillna(last_dec_NDVI))  ### current month NDVI with this dec filled as last dec
+
+prev_NDVI = jnp.array(demand_2018_using_new_season['prev_NDVI'])
+prem_id = jnp.array(demand_2018_using_new_season['prem_id'])
+bill_ym = jnp.array(demand_2018_using_new_season['bill_ym'])
+
+def compute_new_ndvi(Z, Z_current, NDVI, beta_prcp = beta_prcp):
+    new_prcp = Z[:, 2]
+    delta_prcp = new_prcp - Z_current[:, 2]
+    return NDVI + beta_prcp * delta_prcp
+
+compute_new_ndvi_jitted = jax.jit(compute_new_ndvi)
+
+def update_prev_ndvi(new_NDVI, prem_ids, bill_ym):
+    # Sort by prem_id then bill_ym
+    sort_idx = jnp.lexsort((bill_ym, prem_ids))
+    sorted_ndvi = new_NDVI[sort_idx]
+    sorted_prem_ids = prem_ids[sort_idx]
+
+    # Shift NDVI by 1
+    shifted_ndvi = jnp.roll(sorted_ndvi, 1)
+
+    # Identify group boundaries
+    is_first = sorted_prem_ids != jnp.roll(sorted_prem_ids, 1)
+    is_last = jnp.roll(sorted_prem_ids, -1) != sorted_prem_ids
+
+    first_idxs = jnp.nonzero(is_first, size=sorted_ndvi.shape[0], fill_value=-1)[0]
+    last_idxs = jnp.nonzero(is_last, size=sorted_ndvi.shape[0], fill_value=-1)[0]
+
+    # Keep only valid indices (skip -1)
+    valid = (first_idxs >= 0) & (last_idxs >= 0)
+    valid_idx = jnp.nonzero(valid, size=first_idxs.shape[0], fill_value=-1)[0]
+    first_idxs = first_idxs[valid_idx]
+    last_idxs = last_idxs[valid_idx]
+
+    # Create an array to overwrite first elements with last NDVI in group
+    updated = shifted_ndvi.at[first_idxs].set(sorted_ndvi[last_idxs])
+
+    # Unsort to original order
+    inv_idx = jnp.argsort(sort_idx)
+    prev_ndvi = updated[inv_idx]
+    return prev_ndvi
+
+update_prev_ndvi_jitted = jax.jit(update_prev_ndvi)
 
 def calculate_log_w(p_l, q_l, fc_l, Z):
     p_l_CAP = p_l-p_l0 + p_l0_CAP
@@ -560,6 +726,13 @@ def calculate_log_w(p_l, q_l, fc_l, Z):
         result = -fc_l[k] + d_end_CAP[k]
         return result
     calculate_dk_CAP_jitted = jax.jit(calculate_dk_CAP)
+    new_ndvi = compute_new_ndvi_jitted(Z, Z_current, NDVI)
+    prev_NDVI = update_prev_ndvi_jitted(new_ndvi, prem_id, bill_ym)
+    
+    A_o = jnp.column_stack(( 
+        bathroom,
+        prev_NDVI,
+        ))
     
     def get_total_wk (beta_1, beta_2,
                   c_wo,
@@ -569,14 +742,20 @@ def calculate_log_w(p_l, q_l, fc_l, Z):
                   c_r,
                   k, 
                   Z,
-                  A_i = A_current_income,
+                  #A_i = A_current_income,
                  # A_p = A_current_price,
-                  A_o = A_current_outdoor,
-                  G = G,
+                  #A_o = A_current_outdoor,
+                  #G = G,
                   p = p_l, I = I,
                   p0 =p0, 
                   de = de,
                   ):
+        
+        A_i = jnp.column_stack((
+            heavy_water_app,
+            bedroom, 
+            prev_NDVI, 
+        ))
         A_p= jnp.column_stack((
             bedroom, 
             prev_NDVI, 
@@ -854,75 +1033,6 @@ cf_w_moment_mean_jitted = jax.jit(cf_w_moment_mean)
 #p1 = param[0] + param[1]
 #prem_ids = np.array(demand_2018_using_eta['prem_id'], dtype = jnp.int64)
 
-
-#### 0. Full Information, Can Predict Future
-Z_current_using = jnp.column_stack((jnp.array(demand_2018_using_new['mean_TMAX_1']),
-                                      jnp.array(demand_2018_using_new['IQR_TMAX_1']),
-                                      jnp.array(demand_2018_using_new['total_PRCP']) 
-                                      ,jnp.array(demand_2018_using_new['IQR_PRCP'])
-                                      ))
-Z_current = Z_current_using
-
-#### 1. No Information, Do Nothing
-#Z_current_indoor_using =jnp.zeros_like(Z_current_indoor)
-#Z_current_outdoor_using =jnp.zeros_like(Z_current_outdoor)
-
-
-#### 2. Avg Weather info from past 4 years 2014-2017
-
-weather_history = pd.read_csv('weather/weather_history.csv')
-
-weather_history_season = pd.read_csv('weather/weather_history_season.csv')
-
-#demand_2018_using_new = pd.merge(demand_2018_using_new, weather_history, on='bill_ym', how='left' )
-
-weather = pd.merge(weather_history, weather_history_season, on='bill_ym', how='left' )
-
-weather_all_history = pd.read_csv('weather/weather_allhistory_1417.csv')
-
-demand_2018_using_new_season = pd.merge(demand_2018_using_new, weather_history_season, on='bill_ym', how='left' )
-
-demand_2018_using_new_season = pd.merge(demand_2018_using_new_season,weather_all_history , on='bill_ym', how='left' )
-
-#Z_current_outdoor_using = jnp.column_stack((jnp.array(demand_2018_using_new['mean_Tmax_history']),
- #                                     jnp.array(demand_2018_using_new['IQR_Tmax_history']),
-  #                                    jnp.array(demand_2018_using_new['sum_Prcp_history']) 
-   #                                   ,jnp.array(demand_2018_using_new['IQR_Prcp_history'])))
-   
-   
-#Z_current_indoor_using = jnp.array(demand_2018_using_new['mean_Tmax_history'])
-#Z_current_indoor_using = Z_current_indoor_using[:, jnp.newaxis]
-'''
-Z_low = jnp.column_stack((jnp.array(demand_2018_using_new_season['mean_Tmax_history']),
-                                      jnp.array(demand_2018_using_new_season['IQR_Tmax_history']),
-                                      jnp.array(demand_2018_using_new_season['sum_Prcp_low']) 
-                                      ,jnp.array(demand_2018_using_new_season['IQR_Prcp_low'])))
-
-Z_high = jnp.column_stack((jnp.array(demand_2018_using_new_season['mean_Tmax_history']),
-                                      jnp.array(demand_2018_using_new_season['IQR_Tmax_history']),
-                                      jnp.array(demand_2018_using_new_season['sum_Prcp_high']) 
-                                      ,jnp.array(demand_2018_using_new_season['IQR_Prcp_high'])))
-
-Z_extreme_min = jnp.column_stack((jnp.array(demand_2018_using_new_season['mean_Tmax_history']),
-                                      jnp.array(demand_2018_using_new_season['IQR_Tmax_history']),
-                                      jnp.array(demand_2018_using_new_season['sum_Prcp_extreme_min']) 
-                                      ,jnp.array(demand_2018_using_new_season['IQR_Prcp_extreme_min'])))
-
-Z_extreme_max = jnp.column_stack((jnp.array(demand_2018_using_new_season['mean_Tmax_history']),
-                                      jnp.array(demand_2018_using_new_season['IQR_Tmax_history']),
-                                      jnp.array(demand_2018_using_new_season['sum_Prcp_extreme_max']) 
-                                      ,jnp.array(demand_2018_using_new_season['IQR_Prcp_extreme_max'])))
-
-Z_history = jnp.column_stack((jnp.array(demand_2018_using_new_season['mean_Tmax_history']),
-                                      jnp.array(demand_2018_using_new_season['IQR_Tmax_history']),
-                                      jnp.array(demand_2018_using_new_season['sum_Prcp_history']) 
-                                      ,jnp.array(demand_2018_using_new_season['IQR_Prcp_history'])))
-
-Z_zero = jnp.zeros_like(Z_history)
-'''
-
-#log_q0 = cf_w_jitted(p_l0, q_l0, fc_l0, Z_current)
-
 q0 = jnp.exp(log_q0)
 
 def nansum_ignore_nan_inf(arr):
@@ -1124,6 +1234,7 @@ r0 = from_q_to_r_jitted(q_sum_hh0, p_l0, q_l0, fc_l0)
 del A_current_indoor, demand_2018_using_new, demand_2018_using_eta, w_i
 
 #Z_current_indoor
+    
 
 ######################
 #### Consumer Welfare #####
@@ -1186,28 +1297,65 @@ def get_current_marginal_p(q_sum_hh, p_l, q_l, fc_l):
 get_current_marginal_p_jitted = jax.jit(get_current_marginal_p)
 
 def get_expenditure_in_v_out(q_sum_hh, p_l, q_l, fc_l, Z):
+    new_ndvi = compute_new_ndvi_jitted(Z, Z_current, NDVI)
+    prev_NDVI = update_prev_ndvi_jitted(new_ndvi, prem_id, bill_ym)
+    
+    A_o = jnp.column_stack(( 
+        bathroom,
+        prev_NDVI,
+        ))
+    
     A_p= jnp.column_stack((
         bedroom, 
         prev_NDVI, 
         Z[:, 0],
         Z[:, 2],
     ))
+    A_i = jnp.column_stack((
+        heavy_water_app,
+        bedroom, 
+        prev_NDVI, 
+    ))
     alpha = jnp.exp(jnp.dot(A_p, b4)
                 + c_alpha
             )
-    #rho = abs(jnp.dot(A_i, b6)
-     #           + c_rho
-      #          )
+    rho = abs(jnp.dot(A_i, b6)
+                + c_rho
+                )
     p = get_current_marginal_p_jitted(q_sum_hh, p_l, q_l, fc_l)
-    result = jnp.multiply(jnp.exp(jnp.dot(A_current_outdoor, b1) + jnp.dot(Z, b2)+ c_o + eta_l), 
-                                         jnp.divide(jnp.power(p, 1-alpha), jnp.array(1-alpha)))
-    return result
+    exp_factor = jnp.exp(jnp.dot(A_o, b1) + jnp.dot(Z, b2) + c_o + eta_l)
+    tolerance = 1e-2 # Define a small tolerance for numerical stability
+    alpha_minus_1 = alpha - 1.0
+    # Calculate the term related to price, handling alpha close to 1
+    # The term needed for 'result' is exp_factor * [pk^(1-alpha)/(1-alpha)]
+    # When alpha is close to 1, this should be exp_factor * log(pk) (as per the limit of the first term of V)
+    price_component = jnp.where(
+        jnp.abs(alpha_minus_1) < tolerance,
+        jnp.log(p), # Limit case for [pk^(1-alpha)/(1-alpha)] when alpha is close to 1
+        jnp.divide(jnp.power(p, -alpha_minus_1), -alpha_minus_1) # Original calculation
+    )
+    result = exp_factor * price_component
+    return result, rho
 get_expenditure_in_v_out_jitted = jax.jit(get_expenditure_in_v_out)
 
 def get_v_out(q_sum_hh, p_l, q_l, fc_l, Z):
-    exp_v = get_expenditure_in_v_out_jitted(q_sum_hh, p_l,q_l, fc_l, Z)
+    exp_v, rho = get_expenditure_in_v_out_jitted(q_sum_hh, p_l, q_l, fc_l, Z)
     sim_result_Ik = get_virtual_income_jitted(q_sum_hh, p_l, q_l, fc_l)
-    v_out = -1 *exp_v  + jnp.divide(jnp.power(sim_result_Ik, (1-rho)), (1-rho))
+
+    tolerance = 1e-2 # Use the same tolerance
+    rho_minus_1 = rho - 1.0
+    
+    # Calculate the second term of V, handling rho close to 1
+    # The term is (I+d_k)^(1-rho) / (1-rho)
+    second_term_V = jnp.where(
+        jnp.abs(rho_minus_1) < tolerance,
+        jnp.log(sim_result_Ik), # Limit case when rho is close to 1
+        jnp.divide(jnp.power(sim_result_Ik, -rho_minus_1), -rho_minus_1) # Original calculation
+    )
+    
+    # Total V = -exp_v + second_term_V
+    # Note: exp_v is the first term of V *without* the leading negative sign
+    v_out = -1 * exp_v + second_term_V
     return v_out
 get_v_out_jitted = jax.jit(get_v_out)
 
@@ -1229,9 +1377,9 @@ average_Z_jitted = jax.jit(average_Z)
 # Z history will be nrow by 16, first 4 column, 4 years of Tmax, 4 years of IQR, 4 years of prcp and 4 years of IQR
 
 cols_to_extract = ['mean_Tmax_2014', 'mean_Tmax_2015', 'mean_Tmax_2016', 'mean_Tmax_2017',
-             'IQR_Tmax_2014', 'IQR_Tmax_2015', 'IQR_Tmax_2016', 'IQR_Tmax_2017',
-             'sum_Prcp_2014', 'sum_Prcp_2015', 'sum_Prcp_2016', 'sum_Prcp_2017',
-             'IQR_Prcp_2014', 'IQR_Prcp_2015', 'IQR_Prcp_2016', 'IQR_Prcp_2017',]
+                   'IQR_Tmax_2014', 'IQR_Tmax_2015', 'IQR_Tmax_2016', 'IQR_Tmax_2017',
+                   'sum_Prcp_2014', 'sum_Prcp_2015', 'sum_Prcp_2016', 'sum_Prcp_2017',
+                   'IQR_Prcp_2014', 'IQR_Prcp_2015', 'IQR_Prcp_2016', 'IQR_Prcp_2017',]
 
 
 Z_history = jnp.array(demand_2018_using_new_season[cols_to_extract].to_numpy())
@@ -1329,7 +1477,7 @@ def describe(array):
 
 #r_agg_0 = nansum_ignore_nan_inf_jitted(r0_filtered)/12
 r_agg_history = nansum_ignore_nan_inf_jitted(rhistory )/12
-#Array(24357931.65120108, dtype=float64)
+#Array(24568882.90465694, dtype=float64)
 r_agg_0 = nansum_ignore_nan_inf_jitted(r0 )/12
 #Array(7258370.97836945, dtype=float64)
 
@@ -1337,17 +1485,17 @@ r_agg_0 = nansum_ignore_nan_inf_jitted(r0 )/12
 #q0_filtered = q_sum_hh_current[q_sum_hh_current < 150000]
 #q0_filtered = q_sum_hh_history[q_sum_hh_history < 150000]
 q_agg_history = nansum_ignore_nan_inf_jitted(q_sum_hhhistory/100)/12
-# Array(1873818.19426824, dtype=float64)
+# Array(1888873.85061212, dtype=float64)
 q_agg_0 = nansum_ignore_nan_inf_jitted(q_sum_hh0/100)/12
 #Array(794810.84743965, dtype=float64)
 
 cs_history = get_v_out_jitted(q_sum_hhhistory , p_l0, q_l0, fc_l0, Z_1417)
 #cs0_filtered = cs_0[(cs_0 > -0.5*1e9) ]
 cs_agg_history = nansum_ignore_nan_inf_jitted(cs_history)/12
-#Array(-16472436.102381, dtype=float64)
+#Array(1.3481946e+09, dtype=float64)
 cs_0 = get_v_out_jitted(q_sum_hh0, p_l0, q_l0, fc_l0, Z_current)
 cs_agg_0= nansum_ignore_nan_inf_jitted(cs_0)/12
-#Array(-7896280.43952414, dtype=float64)
+#Array(1.35282034e+09, dtype=float64)
 
 # Combine the arrays into a pandas DataFrame
 detail_0 = pd.DataFrame({
@@ -1368,7 +1516,6 @@ detail_history = pd.DataFrame({
 
 # Export the DataFrame to a CSV file
 detail_history.to_csv('ramsey_welfare_result/cs_detail_results/detail_history.csv', index=False)
-
 
 ########################
 #### Revenue Conditions #####
