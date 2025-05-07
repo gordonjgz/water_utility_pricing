@@ -612,7 +612,7 @@ ndvi_df = demand_2018_using_new_season[['prem_id', 'bill_ym', 'prev_NDVI', 'mean
 ndvi_df['NDVI'] = ndvi_df .groupby('prem_id')['prev_NDVI'].shift(-1)
 import statsmodels.formula.api as smf
 
-formula = 'NDVI ~ mean_TMAX_1 + IQR_TMAX_1 + total_PRCP + IQR_PRCP + income'
+formula = 'NDVI ~ mean_TMAX_1 + IQR_TMAX_1 + total_PRCP + IQR_PRCP + income + quantity'
 
 # Fit the OLS (Ordinary Least Squares) model
 model = smf.ols(formula, data=ndvi_df)
@@ -1324,7 +1324,7 @@ def get_expenditure_in_v_out(q_sum_hh, p_l, q_l, fc_l, Z):
                 )
     p = get_current_marginal_p_jitted(q_sum_hh, p_l, q_l, fc_l)
     exp_factor = jnp.exp(jnp.dot(A_o, b1) + jnp.dot(Z, b2) + c_o + eta_l)
-    tolerance = 1e-2 # Define a small tolerance for numerical stability
+    tolerance = 1e-4 # Define a small tolerance for numerical stability
     alpha_minus_1 = alpha - 1.0
     # Calculate the term related to price, handling alpha close to 1
     # The term needed for 'result' is exp_factor * [pk^(1-alpha)/(1-alpha)]
@@ -1342,7 +1342,7 @@ def get_v_out(q_sum_hh, p_l, q_l, fc_l, Z):
     exp_v, rho = get_expenditure_in_v_out_jitted(q_sum_hh, p_l, q_l, fc_l, Z)
     sim_result_Ik = get_virtual_income_jitted(q_sum_hh, p_l, q_l, fc_l)
 
-    tolerance = 1e-2 # Use the same tolerance
+    tolerance = 1e-4 # Use the same tolerance
     rho_minus_1 = rho - 1.0
     
     # Calculate the second term of V, handling rho close to 1
@@ -1492,10 +1492,10 @@ q_agg_0 = nansum_ignore_nan_inf_jitted(q_sum_hh0/100)/12
 cs_history = get_v_out_jitted(q_sum_hhhistory , p_l0, q_l0, fc_l0, Z_1417)
 #cs0_filtered = cs_0[(cs_0 > -0.5*1e9) ]
 cs_agg_history = nansum_ignore_nan_inf_jitted(cs_history)/12
-#Array(1.3481946e+09, dtype=float64)
+#Array(1.3481431e+09, dtype=float64)
 cs_0 = get_v_out_jitted(q_sum_hh0, p_l0, q_l0, fc_l0, Z_current)
 cs_agg_0= nansum_ignore_nan_inf_jitted(cs_0)/12
-#Array(1.35282034e+09, dtype=float64)
+#Array(1.35281184e+09, dtype=float64)
 
 # Combine the arrays into a pandas DataFrame
 detail_0 = pd.DataFrame({
@@ -1516,6 +1516,225 @@ detail_history = pd.DataFrame({
 
 # Export the DataFrame to a CSV file
 detail_history.to_csv('ramsey_welfare_result/cs_detail_results/detail_history.csv', index=False)
+
+######################
+#### EV and CV #####
+########################
+
+mp_0 = jnp.where(CAP == 1,p_l0_CAP[k0], p_l0[k0])
+
+def find_q_sum_hh_close_to_ql(all_q_sum_hh, q_l, tolerance=1e-3):
+    """
+    Finds indices of scaled q_sum_hh values close to any element in q_l
+    and returns the nearest q_l element and its index for each value.
+
+    Args:
+        all_q_sum_hh: JAX array of q_sum_hh values to check.
+        q_l: JAX array of q_l elements (e.g., 4 elements).
+        sim: Scalar or array to divide all_q_sum_hh by.
+        tolerance: The tolerance for considering values "close".
+
+    Returns:
+        A tuple containing:
+        - is_close_to_any_ql: Boolean JAX array of shape (N,), where True indicates the scaled
+          value is close to an element in q_l.
+        - nearest_ql_indices: Integer JAX array of shape (N,), containing the index
+          in q_l that was nearest to the corresponding scaled q_sum_hh value.
+        - nearest_ql_values: JAX array of shape (N,), containing the value from
+          q_l that was nearest to the corresponding scaled q_sum_hh value.
+    """
+    # Scale the input q_sum_hh values
+    q_hh = all_q_sum_hh / sim
+
+    # Reshape for broadcasting: [num_q_sum_hh, 1] vs [1, num_ql]
+    q_hh_reshaped = q_hh[:, None]
+    q_l_reshaped = q_l[None, :]
+
+    # Calculate absolute difference between each q_hh and each q_l element
+    diffs = jnp.abs(q_hh_reshaped - q_l_reshaped)
+
+    # Check if the difference is within tolerance for any q_l element
+    is_close_to_any_ql = jnp.any(diffs < tolerance, axis=1)
+
+    # Find the index of the minimum difference for each q_hh value
+    # This gives the index in q_l that is nearest to each q_hh
+    nearest_ql_indices = jnp.argmin(diffs, axis=1)
+
+    # Get the actual nearest q_l values using the found indices
+    nearest_ql_values = q_l[nearest_ql_indices]
+
+    return is_close_to_any_ql, nearest_ql_indices, nearest_ql_values
+
+find_q_sum_hh_close_to_ql_jitted = jax.jit(find_q_sum_hh_close_to_ql)
+
+@jax.jit
+def solve_for_pbar_vectorized(tk, A, alpha, rho, pk):
+    tolerance = 1e-6  # threshold for "closeness" to 1
+
+    def scalar_solver(tk_, A_, alpha_, rho_, pk_):
+        def f(pbar):
+            log_pbar = jnp.log(pbar)
+            log_pk = jnp.log(pk_)
+
+            # term1: A - α log(pbar)
+            term1 = A_ - alpha_ * log_pbar
+
+            # term2: ρ / (1 - ρ) * A (log(exp(A)) = A)
+            safe_den_rho = jnp.where(jnp.abs(1 - rho_) < tolerance, 1.0, 1 - rho_)
+            term2 = (rho_ / safe_den_rho) * A_
+
+            # diff_term: stable version of (pbar^{1-α} - pk^{1-α}) / (1 - α)
+            safe_den_alpha = jnp.where(jnp.abs(1 - alpha_) < tolerance, 1.0, 1 - alpha_)
+            use_log_diff = jnp.abs(1 - alpha_) < tolerance
+
+            power_diff = jnp.power(pbar, 1 - alpha_) - jnp.power(pk_, 1 - alpha_)
+            log_diff = log_pbar - log_pk
+
+            diff_term = jnp.where(
+                use_log_diff,
+                log_diff,
+                ((1 - rho_) / safe_den_alpha) * power_diff
+            )
+
+            return term1 + term2 * diff_term - jnp.log(tk_)
+
+        # Initial bounds
+        lower = pk_ * 0.5
+        upper = pk_ * 1.5
+
+        def cond(val):
+            l, u, _, i = val
+            return (u - l > 1e-6) & (i < 100)
+
+        def body(val):
+            l, u, _, i = val
+            m = (l + u) / 2
+            f_m = f(m)
+            f_l = f(l)
+            same_sign = f_l * f_m >= 0
+            new_l = jnp.where(same_sign, m, l)
+            new_u = jnp.where(same_sign, u, m)
+            return (new_l, new_u, m, i + 1)
+
+        _, _, root, _ = jax.lax.while_loop(cond, body, (lower, upper, 0.0, 0))
+        return root
+
+    return jax.vmap(scalar_solver)(tk, A, alpha, rho, pk)
+
+def get_e_new_v_p0(q_sum_hh, p_l, q_l, fc_l, Z):
+    v_out = get_v_out_jitted(q_sum_hh, p_l, q_l, fc_l, Z)
+    new_ndvi = compute_new_ndvi_jitted(Z, Z_current, NDVI)
+    prev_NDVI = update_prev_ndvi_jitted(new_ndvi, prem_id, bill_ym)
+    is_close_to_any_ql, nearest_ql_indices, nearest_ql_values = find_q_sum_hh_close_to_ql_jitted(q_sum_hh, q_l)
+    
+    A_o = jnp.column_stack(( 
+        bathroom,
+        prev_NDVI,
+        ))
+    
+    A_p= jnp.column_stack((
+        bedroom, 
+        prev_NDVI, 
+        Z[:, 0],
+        Z[:, 2],
+    ))
+    A_i = jnp.column_stack((
+        heavy_water_app,
+        bedroom, 
+        prev_NDVI, 
+    ))
+    alpha = jnp.exp(jnp.dot(A_p, b4)
+                + c_alpha
+            )
+    rho = abs(jnp.dot(A_i, b6)
+                + c_rho
+                )
+    A_term = jnp.exp(jnp.dot(A_o, b1) + jnp.dot(Z, b2) + c_o+eta_l)
+    tolerance = 1e-4 # Use the same tolerance
+    alpha_minus_1 = alpha - 1.0
+
+
+    pk = get_current_marginal_p(q_sum_hh, p_l, q_l, fc_l)
+    ###########################
+    # Efficient p_bar solving #
+    ###########################
+
+    # Default: mp = pk
+    mp = mp_0
+
+    tk_safe     = jnp.where(is_close_to_any_ql, nearest_ql_values, 1.0)  # dummy tk
+    A_safe      = jnp.where(is_close_to_any_ql, A_term, 0.0)
+    alpha_safe  = jnp.where(is_close_to_any_ql, alpha, 1.5)              # Avoid alpha=1 edge case
+    rho_safe    = jnp.where(is_close_to_any_ql, rho, 0.5)
+    pk_safe     = jnp.where(is_close_to_any_ql, pk, 1.0)     
+
+    # Solve only at kink rows
+    p_bar_solved = solve_for_pbar_vectorized(tk_safe, A_safe, alpha_safe, rho_safe, pk_safe)
+
+    # Blend with default using mask
+    mp = jnp.where(is_close_to_any_ql, p_bar_solved, mp_0)
+    
+    mp_term = jnp.where(
+        jnp.abs(alpha_minus_1) < tolerance,
+        jnp.log(mp), # Limit case when rho is close to 1
+        jnp.divide(jnp.power(mp, -alpha_minus_1), -alpha_minus_1) # Original calculation
+    )
+    
+    # Calculate the base for the final power calculation
+    # The term inside the power is (1-rho) * (v_out + A_term * mp_term)
+    base_arg = jnp.multiply((1 - rho), (v_out + jnp.multiply(A_term, mp_term)))
+
+    # Ensure the base is non-negative and not too small to avoid issues with jnp.power
+    base = jnp.maximum(base_arg, 1e-16)
+
+    # Handle the case where rho is close to 1 separately for numerical stability.
+    # As rho approaches 1, the term ((1-rho) * Y)^(1/(1-rho)) approaches 0.
+    # We use jnp.where to return 0 directly when 1-rho is close to zero.
+    e_out_unscaled = jnp.where(
+        jnp.abs(1 - rho) < tolerance,
+        0.0, # Return 0 when rho is close to 1
+        jnp.power(base, jnp.divide(1.0, (1 - rho))) # Original power calculation otherwise
+    )
+    
+    additional = jnp.where(is_close_to_any_ql, jnp.multiply((p_bar_solved - pk), nearest_ql_values) ,0.0)
+
+    # Apply the scaling factor
+    e_out = jnp.multiply(e_out_unscaled-additional, de)
+    return e_out
+get_e_new_v_p0_jitted = jax.jit(get_e_new_v_p0)
+
+
+def get_diff_payment(q_sum_hh, p_l, q_l, fc_l):
+    k = get_k_jitted(q_sum_hh, q_l)
+    q_l = jnp.insert(q_l, 0, 0)
+    diff_payment = jnp.cumsum(jnp.multiply((p_l - p_l0), q_l))
+    diff_payment = diff_payment[k]
+    diff_payment = jnp.multiply(diff_payment, de)
+    return diff_payment
+get_diff_payment_jitted = jax.jit(get_diff_payment)
+    
+    
+def get_ev(q_sum_hh, p_l, q_l, fc_l,Z, I = I, de = de):
+    e = get_e_new_v_p0_jitted(q_sum_hh, p_l, q_l, fc_l, Z)
+    diff_payment = get_diff_payment_jitted(q_sum_hh, p_l, q_l, fc_l)
+    ev = e - diff_payment - I
+    return ev
+get_ev_jitted = jax.jit(get_ev)
+
+imu_0 = jnp.power(jnp.maximum(jnp.multiply(d_k0, de) + I, 1e-16), rho)
+
+def get_compensating_variation (cs1):
+    """
+    This arises from a first-order Taylor approximation of the expenditure function, and assumes that:
+    Utility is quasi-linear or homothetic in income (which the utility form approximates),
+    The marginal utility of income doesn't change too drastically over the utility change — i.e., no big income effect "kinks".
+    """
+    diff_cs = cs1 - cs_0
+    mu_income = jnp.power(jnp.maximum(jnp.multiply(d_k0, de) + I, 1e-16), rho)
+    result = jnp.multiply(diff_cs, mu_income)
+    return result
+get_compensating_variation_jitted = jax.jit(get_compensating_variation)
+
 
 ########################
 #### Revenue Conditions #####
@@ -1584,13 +1803,16 @@ conservation_condition_jitted = jax.jit(conservation_condition)
 
 def get_result (p_l, q_l, fc_l, Z):
     q_sum_hh = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z)
-   # r = from_q_to_r_jitted(q_sum_hh, p_l, q_l, fc_l)
-    cs = get_v_out(q_sum_hh, p_l, q_l, fc_l, Z)
-    result =cs
+    #r = from_q_to_r_jitted(q_sum_hh, p_l, q_l, fc_l)
+    ev = get_ev_jitted(q_sum_hh, p_l, q_l, fc_l, Z)
+    #cs = get_v_out(q_sum_hh, p_l, q_l, fc_l, Z)
+    #cv = get_compensating_variation_jitted(cs)
+    ev_fullyear = nansum_ignore_nan_inf_jitted(ev)
     #result =cs * ( cs > -0.5 * 1e9)
     #result = jnp.zeros_like(cs)
     #result = result.at[jnp.where(mask)].set(cs[mask])
     #+ lam * r
+    result = ev_fullyear
     return result
 
 get_result_jitted = jax.jit(get_result)
@@ -1683,7 +1905,8 @@ def objective0(param, Z):
     #result_high = get_result_jitted(p_l, q_l, fc_l, Z_high, lam)
     #result = (result_low + result_high)/2
     result = get_result_jitted(p_l, q_l, fc_l, processed_Z)
-    result = -1 * nansum_ignore_nan_inf_jitted(result)
+    result = -1 * result
+    #result = -1 * nansum_ignore_nan_inf_jitted(result)
     #result = -1 * sum_ignore_outliers_jitted(result)
     result_value = jax.device_get(result)
     jax.debug.print("Current Value {x}", x= result_value)
@@ -2474,11 +2697,13 @@ for step in steps:
         conserve_value = conservation_constraint_jitted(solution1_nobd_final.x, Z_step)
         revenue_value = revenue_lower_bound_constraint_jitted(solution1_nobd_final.x, Z_step)
 
-        if conserve_value < 0.95 or conserve_value > 1.0:
-            raise ValueError(f"Step {step}: Conservation constraint violated! Value: {conserve_value}")
+        tolerance = 1e-6
 
-        if revenue_value < 0.0:
-            raise ValueError(f"Step {step}: Revenue constraint violated! Value: {revenue_value}")
+        if conserve_value < (1.0 - tolerance) or conserve_value > (1.0 + tolerance):
+           raise ValueError(f"Step {step}: Conservation constraint violated! Value: {conserve_value}")
+
+        if revenue_value < -tolerance:
+           raise ValueError(f"Step {step}: Revenue constraint violated! Value: {revenue_value}")
 
         # Compute optimal price and quantities
         p_l, q_l, fc_l = param_to_pq0_jitted(solution1_nobd_final.x)
@@ -2740,7 +2965,7 @@ param0_high = jnp.array([3, 4, 4, 4, 4,
                     2, 
                     6-2, 11-6, 20-11,
                     8.5, 
-                    7.125,7.125,7.125,7.125
+                    7,7,7,7
                     ])
 
 
@@ -2815,11 +3040,13 @@ for step in s_steps:
         conserve_value = conservation_constraint_jitted(solution1_nobd_final.x, Z_step)
         revenue_value = revenue_lower_bound_constraint_jitted(solution1_nobd_final.x, Z_step)
 
-        if conserve_value < 0.95 or conserve_value > 1.0:
-            raise ValueError(f"Step {step}: Conservation constraint violated! Value: {conserve_value}")
+        tolerance = 1e-6
 
-        if revenue_value < 0.0:
-            raise ValueError(f"Step {step}: Revenue constraint violated! Value: {revenue_value}")
+        if conserve_value < (1.0 - tolerance) or conserve_value > (1.0 + tolerance):
+           raise ValueError(f"Step {step}: Conservation constraint violated! Value: {conserve_value}")
+
+        if revenue_value < -tolerance:
+           raise ValueError(f"Step {step}: Revenue constraint violated! Value: {revenue_value}")
 
         # Compute optimal price and quantities
         p_l, q_l, fc_l = param_to_pq0_jitted(solution1_nobd_final.x)
@@ -3029,11 +3256,13 @@ for step in steps:
         conserve_value = conservation_constraint_jitted(solution1_nobd_final.x, Z_step)
         revenue_value = revenue_lower_bound_crra_constraint_jitted(solution1_nobd_final.x, Z_step)
 
-        if conserve_value < 0.95 or conserve_value > 1.0:
-            raise ValueError(f"Step {step}: Conservation constraint violated! Value: {conserve_value}")
+        tolerance = 1e-6
 
-        if revenue_value < 0.0:
-            raise ValueError(f"Step {step}: Revenue constraint violated! Value: {revenue_value}")
+        if conserve_value < (1.0 - tolerance) or conserve_value > (1.0 + tolerance):
+           raise ValueError(f"Step {step}: Conservation constraint violated! Value: {conserve_value}")
+
+        if revenue_value < -tolerance:
+           raise ValueError(f"Step {step}: Revenue constraint violated! Value: {revenue_value}")
 
         # Compute optimal price and quantities
         p_l, q_l, fc_l = param_to_pq0_jitted(solution1_nobd_final.x)
@@ -3299,12 +3528,14 @@ for step in s_steps:
         # **Check for Constraint Violations**
         conserve_value = conservation_constraint_jitted(solution1_nobd_final.x, Z_step)
         revenue_value = revenue_lower_bound_crra_constraint_jitted(solution1_nobd_final.x, Z_step)
+        
+        tolerance = 1e-6
 
-        if conserve_value < 0.95 or conserve_value > 1.0:
-            raise ValueError(f"Step {step}: Conservation constraint violated! Value: {conserve_value}")
+        if conserve_value < (1.0 - tolerance) or conserve_value > (1.0 + tolerance):
+           raise ValueError(f"Step {step}: Conservation constraint violated! Value: {conserve_value}")
 
-        if revenue_value < 0.0:
-            raise ValueError(f"Step {step}: Revenue constraint violated! Value: {revenue_value}")
+        if revenue_value < -tolerance:
+           raise ValueError(f"Step {step}: Revenue constraint violated! Value: {revenue_value}")
 
         # Compute optimal price and quantities
         p_l, q_l, fc_l = param_to_pq0_jitted(solution1_nobd_final.x)
