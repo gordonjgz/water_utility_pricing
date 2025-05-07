@@ -1568,35 +1568,53 @@ def find_q_sum_hh_close_to_ql(all_q_sum_hh, q_l, tolerance=1e-3):
 find_q_sum_hh_close_to_ql_jitted = jax.jit(find_q_sum_hh_close_to_ql)
 
 @jax.jit
-def solve_for_pbar_vectorized(tk, A, alpha, rho, pk):
-    tolerance = 1e-6  # threshold for "closeness" to 1
+def solve_for_pbar_vectorized(tk, A, alpha, rho, pk, vi0):
+    #tolerance = 1e-6  # threshold for "closeness" to 1
 
-    def scalar_solver(tk_, A_, alpha_, rho_, pk_):
+    def scalar_solver(tk_, A_, alpha_, rho_, pk_,vi0_, eps=1e-6):
+        log_tk = jnp.log(tk_)
         def f(pbar):
-            log_pbar = jnp.log(pbar)
-            log_pk = jnp.log(pk_)
+            # Use epsilon cutoff to trigger limit cases
+            near_alpha_1 = jnp.abs(1.0 - alpha_) < eps
+            near_rho_1 = jnp.abs(1.0 - rho_) < eps
 
-            # term1: A - α log(pbar)
-            term1 = A_ - alpha_ * log_pbar
-
-            # term2: ρ / (1 - ρ) * A (log(exp(A)) = A)
-            safe_den_rho = jnp.where(jnp.abs(1 - rho_) < tolerance, 1.0, 1 - rho_)
-            term2 = (rho_ / safe_den_rho) * A_
-
-            # diff_term: stable version of (pbar^{1-α} - pk^{1-α}) / (1 - α)
-            safe_den_alpha = jnp.where(jnp.abs(1 - alpha_) < tolerance, 1.0, 1 - alpha_)
-            use_log_diff = jnp.abs(1 - alpha_) < tolerance
-
-            power_diff = jnp.power(pbar, 1 - alpha_) - jnp.power(pk_, 1 - alpha_)
-            log_diff = log_pbar - log_pk
-
-            diff_term = jnp.where(
-                use_log_diff,
-                log_diff,
-                ((1 - rho_) / safe_den_alpha) * power_diff
+            # Power difference for alpha ≠ 1
+            p_diff = jnp.where(
+                near_alpha_1,
+                jnp.log(pbar) - jnp.log(pk_),
+                pbar**(1 - alpha_) - pk_**(1 - alpha_)
             )
 
-            return term1 + term2 * diff_term - jnp.log(tk_)
+            # Multiplier for inner log term
+            alpha_term = jnp.where(
+                near_alpha_1,
+                1.0,  # lim_{α→1} (1 - α)/(1 - ρ) * (log p̄ - log pk)
+                (1 - alpha_) / (1 - rho_)
+            )
+
+            # Additive term (I + d0)^{1 - rho}
+            Id_term = jnp.where(
+                near_rho_1,
+                jnp.log(vi0_),  # lim_{ρ→1} log(I + d0)
+                (vi0_)**(1 - rho_)
+            )
+
+            # Inner log argument
+            inner = jnp.where(
+                near_rho_1,
+                jnp.exp(A_) * alpha_term * p_diff + Id_term,
+                jnp.exp(A_) * alpha_term * p_diff + Id_term
+            )
+            inner = jnp.maximum(inner, 1e-12)  # prevent log(0)
+
+            # Full function expression
+            f_val = A_ - alpha_ * jnp.log(pbar)
+            f_val += jnp.where(
+                near_rho_1,
+                rho_ * jnp.log(inner),  # lim_{ρ→1}
+                (rho_ / (1 - rho_)) * jnp.log(inner)
+            )
+            return f_val - log_tk
 
         # Initial bounds
         lower = pk_ * 0.5
@@ -1619,7 +1637,10 @@ def solve_for_pbar_vectorized(tk, A, alpha, rho, pk):
         _, _, root, _ = jax.lax.while_loop(cond, body, (lower, upper, 0.0, 0))
         return root
 
-    return jax.vmap(scalar_solver)(tk, A, alpha, rho, pk)
+    return jax.vmap(scalar_solver)(tk, A, alpha, rho, pk, vi0)
+
+
+vi_0 = get_virtual_income_jitted(q_sum_hh0, p_l0, q_l0, fc_l0)
 
 def get_e_new_v_p0(q_sum_hh, p_l, q_l, fc_l, Z):
     v_out = get_v_out_jitted(q_sum_hh, p_l, q_l, fc_l, Z)
@@ -1666,10 +1687,11 @@ def get_e_new_v_p0(q_sum_hh, p_l, q_l, fc_l, Z):
     A_safe      = jnp.where(is_close_to_any_ql, A_term, 0.0)
     alpha_safe  = jnp.where(is_close_to_any_ql, alpha, 1.5)              # Avoid alpha=1 edge case
     rho_safe    = jnp.where(is_close_to_any_ql, rho, 0.5)
-    pk_safe     = jnp.where(is_close_to_any_ql, pk, 1.0)     
+    pk_safe     = jnp.where(is_close_to_any_ql, pk, 1.0)
+    vi0_safe     = jnp.where(is_close_to_any_ql, vi_0, 1.0)     
 
     # Solve only at kink rows
-    p_bar_solved = solve_for_pbar_vectorized(tk_safe, A_safe, alpha_safe, rho_safe, pk_safe)
+    p_bar_solved = solve_for_pbar_vectorized(tk_safe, A_safe, alpha_safe, rho_safe, pk_safe, vi0_safe)
 
     # Blend with default using mask
     mp = jnp.where(is_close_to_any_ql, p_bar_solved, mp_0)
@@ -1696,7 +1718,7 @@ def get_e_new_v_p0(q_sum_hh, p_l, q_l, fc_l, Z):
         jnp.power(base, jnp.divide(1.0, (1 - rho))) # Original power calculation otherwise
     )
     
-    additional = jnp.where(is_close_to_any_ql, jnp.multiply((p_bar_solved - pk), nearest_ql_values) ,0.0)
+    additional = jnp.where(is_close_to_any_ql, jnp.multiply((p_bar_solved - mp_0), q_l0[k0]) ,0.0)
 
     # Apply the scaling factor
     e_out = jnp.multiply(e_out_unscaled-additional, de)
@@ -1713,11 +1735,10 @@ def get_diff_payment(q_sum_hh, p_l, q_l, fc_l):
     return diff_payment
 get_diff_payment_jitted = jax.jit(get_diff_payment)
     
-    
 def get_ev(q_sum_hh, p_l, q_l, fc_l,Z, I = I, de = de):
     e = get_e_new_v_p0_jitted(q_sum_hh, p_l, q_l, fc_l, Z)
-    diff_payment = get_diff_payment_jitted(q_sum_hh, p_l, q_l, fc_l)
-    ev = e - diff_payment - I
+    #diff_payment = get_diff_payment_jitted(q_sum_hh, p_l, q_l, fc_l)
+    ev = e - vi_0
     return ev
 get_ev_jitted = jax.jit(get_ev)
 
