@@ -28,7 +28,11 @@
 ├── price_elasticity/           # Code to generate price elasticity
 ├── counterfactual_temp/        # Counterfactual analysis that's not been used
 ├── counterfactual_ramsey/      # Counterfactual analysis of Ramsey Pricing Model
+├── README.md                   # Project overview (this file)
+├── Gordon_JI_CV.pdf            # CV
+├── gordonji_jmp_2026.pdf      # Job Market Paper (Last edited June 2025)
 └── README.md                   # Project overview (this file)
+
 ```
 ---
 
@@ -44,7 +48,7 @@ This repository accompanies my dissertation research on the intersection of util
 
 ## 📊 Data
 
-The data come from Austin Water's monthly transaction records.  
+The data comes from Austin Water's monthly transaction records.  
 Due to privacy constraints, raw data are not publicly included.  
 
 ---
