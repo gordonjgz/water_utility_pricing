@@ -31,6 +31,7 @@
 ├── README.md                   # Project overview (this file)
 ├── Gordon_JI_CV.pdf            # CV
 ├── gordonji_jmp_2026.pdf      # Job Market Paper (Last edited June 2025)
+├── Other Paper/               # Other Paper authored by me
 └── README.md                   # Project overview (this file)
 
 ```
