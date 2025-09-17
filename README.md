@@ -31,6 +31,7 @@
 ├── README.md                   # Project overview (this file)
 ├── Gordon_JI_CV.pdf            # CV
 ├── gordonji_jmp_2026.pdf      # Job Market Paper (Last edited June 2025)
+├── Other Paper/               # Other Paper authored by me
 └── README.md                   # Project overview (this file)
 
 ```
@@ -41,8 +42,9 @@
 This repository accompanies my dissertation research on the intersection of utility pricing, climate variability, and economic welfare. It includes:
 
 - A structural DCC model of household water demand
-- Counterfactual simulations of Ramsey pricing under different precipitation variances
-- Distributional and revenue tradeoff analysis under risk-averse utility preferences
+- Counterfactual simulations of Ramsey pricing under different weather conditions
+- Estimation of the shadow cost of policy constraint under counterfactual weather conditions, especially for the lowest income stratum
+- The welfare benefit from the additional policies like Zeroscaping towards the lowest income stratum
 
 ---
 
