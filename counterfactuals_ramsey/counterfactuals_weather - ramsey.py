@@ -439,7 +439,7 @@ demand_2018_using_new.to_csv('demand_2018_using_new.csv', index=False)
 ############################################
  """
 import os
-os.environ['JAX_ENABLE_X64'] = 'flase'
+os.environ['JAX_ENABLE_X64'] = 'false'
 from jax import config
 config.update("jax_enable_x64", False)
 
@@ -557,7 +557,7 @@ sim = 100
 len_transactions = len( demand_2018_using_new)  
 shape = (len_transactions, sim)
 nu_array = np.random.normal(loc = 0, scale = sigma_nu, size = shape)
-#eta_l = jnp.array(demand_2018_using_eta['e_diff'])
+eta_l_diff = jnp.array(demand_2018_using_eta['e_diff'])
 
 eta_l = jnp.array(demand_2018_using_eta['mean_e_diff'])
 
@@ -689,10 +689,14 @@ prev_NDVI = jnp.array(demand_2018_using_new_season['prev_NDVI'])
 prem_id = jnp.array(demand_2018_using_new_season['prem_id'])
 bill_ym = jnp.array(demand_2018_using_new_season['bill_ym'])
 
-def compute_new_ndvi(Z, Z_current, NDVI, beta_prcp = beta_prcp):
+#### The plug in of NDVI is always current month
+#### will return prev_NDVI after the process
+
+def compute_new_ndvi(Z, Z_current, ndv, beta_prcp = beta_prcp):
+    #print("Shape of Z:", Z.shape) 
     new_prcp = Z[:, 2]
     delta_prcp = new_prcp - Z_current[:, 2]
-    return NDVI + beta_prcp * delta_prcp
+    return ndv + beta_prcp * delta_prcp
 
 compute_new_ndvi_jitted = jax.jit(compute_new_ndvi)
 
@@ -728,7 +732,7 @@ def update_prev_ndvi(new_NDVI, prem_ids, bill_ym):
 
 update_prev_ndvi_jitted = jax.jit(update_prev_ndvi)
 
-def calculate_log_w(p_l, q_l, fc_l, Z):
+def calculate_log_w(p_l, q_l, fc_l, Z, ndv):
     p_l_CAP = p_l-p_l0 + p_l0_CAP
     q_kink_l = q_l
     p_plus1_l = jnp.append(p_l[1:5],jnp.array([jnp.nan]) )
@@ -748,7 +752,8 @@ def calculate_log_w(p_l, q_l, fc_l, Z):
         result = -fc_l[k] + d_end_CAP[k]
         return result
     calculate_dk_CAP_jitted = jax.jit(calculate_dk_CAP)
-    new_ndvi = compute_new_ndvi_jitted(Z, Z_current, NDVI)
+    
+    new_ndvi = compute_new_ndvi_jitted(Z, Z_current, ndv)
     prev_NDVI = update_prev_ndvi_jitted(new_ndvi, prem_id, bill_ym)
     
     A_o = jnp.column_stack(( 
@@ -867,10 +872,10 @@ def get_log_q_inner(log_w_k, q_l):
     return result
 get_log_q_inner_jitted = jax.jit(get_log_q_inner)
 
-def cf_w (p_l, q_l, fc_l, Z,
+def cf_w (p_l, q_l, fc_l, Z, ndv,
           #nu_array = nu_array,
           eta_l = eta_l):
-    log_q_sim = get_log_q_sim_jitted(p_l, q_l, fc_l, Z)
+    log_q_sim = get_log_q_sim_jitted(p_l, q_l, fc_l, Z, ndv)
     log_q_sim = log_q_sim.reshape(len_transactions, sim)
     #gc.collect()
     #nu_array =  gen_nu_array_jitted(sigma_nu)
@@ -879,20 +884,20 @@ def cf_w (p_l, q_l, fc_l, Z,
 cf_w_jitted = jax.jit(cf_w)
 
 
-def get_log_w(p_l, q_l, fc_l,Z,
+def get_log_w(p_l, q_l, fc_l,Z,ndv,
           nu_array = nu_array,
           eta_l = eta_l):
-    log_w = calculate_log_w_jitted(p_l, q_l, fc_l, Z)
+    log_w = calculate_log_w_jitted(p_l, q_l, fc_l, Z, ndv)
     #log_w = jnp.column_stack((log_w, eta_l))
     log_w = jnp.column_stack((log_w, nu_array))
     return log_w
 get_log_w_jitted = jax.jit(get_log_w)
 
-def get_log_q_sim(p_l, q_l, fc_l, Z,
+def get_log_q_sim(p_l, q_l, fc_l, Z,ndv,
           nu_array = nu_array,
           eta_l = eta_l):
     #nu_array = gen_nu_array_jitted(sigma_nu)
-    log_w = get_log_w_jitted(p_l, q_l, fc_l, Z)
+    log_w = get_log_w_jitted(p_l, q_l, fc_l, Z, ndv)
     log_w = jnp.column_stack((log_w, eta_l))
     
     def get_log_q (log_w_k, q_l = q_l):
@@ -949,7 +954,7 @@ q_statusquo_sum = jnp.sum(q_statusquo)
 alpha = jnp.exp(jnp.dot(A_current_price, b4)
                     + c_alpha)
 
-rho = jnp.exp(jnp.dot(A_current_income, b6)
+rho = abs(jnp.dot(A_current_income, b6)
                     + c_rho)
 
 demand_2018_using_new.loc[:, 'e_alpha'] = alpha
@@ -959,7 +964,7 @@ CAP = jnp.array(demand_2018_using_new['CAP_HH'])
 
 Z_current = Z_current_outdoor
 
-log_q0 = cf_w_jitted(p_l0, q_l0, fc_l0, Z_current)
+log_q0 = cf_w_jitted(p_l0, q_l0, fc_l0, Z_current, NDVI)
 
 '''
 def cf_w_moment(p_l, q_l, fc_l, sigma_eta_df):
@@ -1144,8 +1149,8 @@ def sum_ignore_outliers_otheraxis(arr, lower_percentile=25, upper_percentile=75)
 # JIT the function
 sum_ignore_outliers_otheraxis_jitted = jax.jit(sum_ignore_outliers_otheraxis)
 
-def get_q_sum(p_l, q_l, fc_l, Z):
-    log_q = cf_w_jitted(p_l, q_l, fc_l, Z)
+def get_q_sum(p_l, q_l, fc_l, Z, ndv):
+    log_q = cf_w_jitted(p_l, q_l, fc_l, Z, ndv)
     chunk_size = 100 
     num_columns = log_q.shape[1]
     result_hh = []
@@ -1167,8 +1172,8 @@ def get_q_sum(p_l, q_l, fc_l, Z):
     return q_sum_hh, q_sum_sim
 get_q_sum_jitted = jax.jit(get_q_sum)
 
-def get_q_sum_hh(p_l, q_l, fc_l, Z):
-    log_q = cf_w_jitted(p_l, q_l, fc_l, Z)
+def get_q_sum_hh(p_l, q_l, fc_l, Z, ndv):
+    log_q = cf_w_jitted(p_l, q_l, fc_l, Z, ndv)
     
     #chunk_size = 100 
     #num_columns = log_q.shape[1]
@@ -1193,8 +1198,8 @@ def get_q_sum_hh(p_l, q_l, fc_l, Z):
     return q_sum_hh
 get_q_sum_hh_jitted = jax.jit(get_q_sum_hh)
 
-def get_q_sum_sim(p_l, q_l, fc_l, Z):
-    log_q = cf_w_jitted(p_l, q_l, fc_l, Z)
+def get_q_sum_sim(p_l, q_l, fc_l, Z, ndv):
+    log_q = cf_w_jitted(p_l, q_l, fc_l, Z, ndv)
     #chunk_size = 100 
     #num_columns = log_q.shape[1]
     #result_hh = []
@@ -1250,7 +1255,7 @@ def get_r(r_mean, prem_id = None):
 
 get_r_jitted = jax.jit(get_r)
 
-q_sum_hh0 = get_q_sum_hh_jitted(p_l0, q_l0, fc_l0, Z_current)
+q_sum_hh0 = get_q_sum_hh_jitted(p_l0, q_l0, fc_l0, Z_current, NDVI)
 r0 = from_q_to_r_jitted(q_sum_hh0, p_l0, q_l0, fc_l0)
 
 del A_current_indoor, demand_2018_using_new, demand_2018_using_eta, w_i
@@ -1304,7 +1309,7 @@ def get_virtual_income(q_sum_hh, p_l, q_l, fc_l):
     
     k = get_k_jitted(q_sum_hh, q_l)
     d_k = jnp.where(CAP == 1, calculate_dk_CAP_jitted(k), calculate_dk_jitted(k))
-    virtual_income = jnp.maximum(jnp.multiply(d_k, de) + I, 1e-16)
+    virtual_income = jnp.maximum(d_k + I, 1e-16)
     return virtual_income
 get_virtual_income_jitted = jax.jit(get_virtual_income)
 
@@ -1328,8 +1333,8 @@ demand_eta['mean_eta'] = demand_eta.groupby('prem_id')['eta'].transform('mean')
 
 mean_eta_l = jnp.array(demand_eta['mean_eta'])
 
-def get_expenditure_in_v_out(q_sum_hh, p_l, q_l, fc_l, Z):
-    new_ndvi = compute_new_ndvi_jitted(Z, Z_current, NDVI)
+def get_expenditure_in_v_out(q_sum_hh, p_l, q_l, fc_l, Z, ndv):
+    new_ndvi = compute_new_ndvi_jitted(Z, Z_current, ndv)
     prev_NDVI = update_prev_ndvi_jitted(new_ndvi, prem_id, bill_ym)
     
     A_o = jnp.column_stack(( 
@@ -1351,9 +1356,9 @@ def get_expenditure_in_v_out(q_sum_hh, p_l, q_l, fc_l, Z):
     alpha = jnp.exp(jnp.dot(A_p, b4)
                 + c_alpha
             )
-    rho = abs(jnp.dot(A_i, b6)
-                + c_rho
-                )
+    #rho = abs(jnp.dot(A_i, b6)
+     #           + c_rho
+      #          )
     p = get_current_marginal_p_jitted(q_sum_hh, p_l, q_l, fc_l)
     exp_factor = jnp.exp(jnp.dot(A_o, b1) + jnp.dot(Z, b2) + c_o + mean_eta_l+mean_nu_array)
     tolerance = 1e-3 # Define a small tolerance for numerical stability
@@ -1367,11 +1372,11 @@ def get_expenditure_in_v_out(q_sum_hh, p_l, q_l, fc_l, Z):
         jnp.divide(jnp.power(p, -alpha_minus_1), -alpha_minus_1) # Original calculation
     )
     result = exp_factor * price_component
-    return result, rho
+    return result
 get_expenditure_in_v_out_jitted = jax.jit(get_expenditure_in_v_out)
 
-def get_v_out(q_sum_hh, p_l, q_l, fc_l, Z):
-    exp_v, rho = get_expenditure_in_v_out_jitted(q_sum_hh, p_l, q_l, fc_l, Z)
+def get_v_out(q_sum_hh, p_l, q_l, fc_l, Z, ndv):
+    exp_v = get_expenditure_in_v_out_jitted(q_sum_hh, p_l, q_l, fc_l, Z, ndv)
     sim_result_Ik = get_virtual_income_jitted(q_sum_hh, p_l, q_l, fc_l)
 
     tolerance = 1e-3 # Use the same tolerance
@@ -1417,13 +1422,13 @@ cols_to_extract = ['mean_Tmax_2014', 'mean_Tmax_2015', 'mean_Tmax_2016', 'mean_T
 Z_history = jnp.array(demand_2018_using_new_season[cols_to_extract].to_numpy())
 Z_1417 = average_Z_jitted(Z_history)
 
-log_qhistory = cf_w_jitted(p_l0, q_l0, fc_l0, Z_1417)
+log_qhistory = cf_w_jitted(p_l0, q_l0, fc_l0, Z_1417, NDVI)
 qhistory = jnp.exp(log_qhistory)
 
 qhistory_sum =nansum_ignore_nan_inf_jitted(qhistory)
 qhistory_mean = nanmean_ignore_nan_inf_jitted(qhistory)
 
-q_sum_hhhistory = get_q_sum_hh_jitted(p_l0, q_l0, fc_l0, Z_1417)
+q_sum_hhhistory = get_q_sum_hh_jitted(p_l0, q_l0, fc_l0, Z_1417, NDVI)
 rhistory = from_q_to_r_jitted(q_sum_hhhistory, p_l0, q_l0, fc_l0)
 
 bill_ym = jnp.array(demand_2018_using_new_season['bill_ym'])
@@ -1509,25 +1514,25 @@ def describe(array):
 
 #r_agg_0 = nansum_ignore_nan_inf_jitted(r0_filtered)/12
 r_agg_history = nansum_ignore_nan_inf_jitted(rhistory )/12
-#Array(7185366.2319867, dtype=float64)
+#Array(7185490.5, dtype=float32)
 r_agg_0 = nansum_ignore_nan_inf_jitted(r0 )/12
-#Array(28058192.92994599, dtype=float64)
+#Array(28058358., dtype=float32)
 
 #q_sum_hh_1417 = get_q_sum_hh_jitted(p_l0, q_l0, fc_l0, Z_1417)
 #q0_filtered = q_sum_hh_current[q_sum_hh_current < 150000]
 #q0_filtered = q_sum_hh_history[q_sum_hh_history < 150000]
 q_agg_history = nansum_ignore_nan_inf_jitted(q_sum_hhhistory/100)/12
-# Array(721182.51175329, dtype=float64)
+# Array(721182.7, dtype=float32)
 q_agg_0 = nansum_ignore_nan_inf_jitted(q_sum_hh0/100)/12
-#Array(2276729.1038763 dtype=float64)
+#Array(2276729.2, dtype=float32)
 
-cs_history = get_v_out_jitted(q_sum_hhhistory , p_l0, q_l0, fc_l0, Z_1417)
+cs_history = get_v_out_jitted(q_sum_hhhistory , p_l0, q_l0, fc_l0, Z_1417, NDVI)
 #cs0_filtered = cs_0[(cs_0 > -0.5*1e9) ]
 cs_agg_history = nansum_ignore_nan_inf_jitted(cs_history)/12
-#Array(1.35726374e+09, dtype=float64)
-cs_0 = get_v_out_jitted(q_sum_hh0, p_l0, q_l0, fc_l0, Z_current)
+# Array(1.3506276e+09, dtype=float32)
+cs_0 = get_v_out_jitted(q_sum_hh0, p_l0, q_l0, fc_l0, Z_current, NDVI)
 cs_agg_0= nansum_ignore_nan_inf_jitted(cs_0)/12
-#Array(1.33489888e+09, dtype=float64)
+#Array(1.3349313e+09, dtype=float32)
 
 # Combine the arrays into a pandas DataFrame
 detail_0 = pd.DataFrame({
@@ -1673,12 +1678,20 @@ def solve_for_pbar_vectorized(tk, A, alpha, rho, pk, vi0):
 
 vi_0 = get_virtual_income_jitted(q_sum_hh0, p_l0, q_l0, fc_l0)
 
-def get_e_new_v_p0(q_sum_hh, p_l, q_l, fc_l, Z):
-    v_out = get_v_out_jitted(q_sum_hh, p_l, q_l, fc_l, Z)
-    new_ndvi = compute_new_ndvi_jitted(Z, Z_current, NDVI)
-    prev_NDVI = update_prev_ndvi_jitted(new_ndvi, prem_id, bill_ym)
+def get_e_new_v_p0(q_sum_hh, v_out, p_l = p_l0, q_l = q_l0, fc_l = fc_l0, Z = Z_current, ndv = NDVI):
+    '''
+    Parameters
+    ----------
+    q_sum_hh : TYPE
+        New counterfactual quantity
+    v_out : TYPE
+        New counterfactual utility
+
+    '''
+    #new_ndvi = compute_new_ndvi_jitted(Z, Z_current, ndv)
+    #prev_NDVI = update_prev_ndvi_jitted(new_ndvi, prem_id, bill_ym)
     is_close_to_any_ql, nearest_ql_indices, nearest_ql_values = find_q_sum_hh_close_to_ql_jitted(q_sum_hh, q_l)
-    
+    """
     A_o = jnp.column_stack(( 
         bathroom,
         prev_NDVI,
@@ -1701,12 +1714,18 @@ def get_e_new_v_p0(q_sum_hh, p_l, q_l, fc_l, Z):
     rho = abs(jnp.dot(A_i, b6)
                 + c_rho
                 )
-    A_term = jnp.exp(jnp.dot(A_o, b1) + jnp.dot(Z, b2) + c_o+eta_l)
+    """
+    A_o = A_current_outdoor
+    A_p = A_current_price
+    A_i = A_current_income
+    
+    A_term = jnp.exp(jnp.dot(A_o, b1) + jnp.dot(Z, b2) + c_o+ mean_eta_l + mean_nu_array)
     tolerance = 1e-3 # Use the same tolerance
     alpha_minus_1 = alpha - 1.0
 
 
-    pk = get_current_marginal_p(q_sum_hh, p_l, q_l, fc_l)
+    #pk = get_current_marginal_p(q_sum_hh, p_l, q_l, fc_l)
+    pk = mp_0
     ###########################
     # Efficient p_bar solving #
     ###########################
@@ -1748,30 +1767,69 @@ def get_e_new_v_p0(q_sum_hh, p_l, q_l, fc_l, Z):
         0.0, # Return 0 when rho is close to 1
         jnp.power(base, jnp.divide(1.0, (1 - rho))) # Original power calculation otherwise
     )
-    
-    additional = jnp.where(is_close_to_any_ql, jnp.multiply((p_bar_solved - mp_0), q_l0[k0]) ,0.0)
+    additional = jnp.where(is_close_to_any_ql, jnp.multiply((p_bar_solved - mp_0), nearest_ql_values) , 0.0)
 
     # Apply the scaling factor
-    e_out = jnp.multiply(e_out_unscaled-additional, de)
+    e_out = e_out_unscaled - additional
     return e_out
 get_e_new_v_p0_jitted = jax.jit(get_e_new_v_p0)
 
+def _calculate_subsidy(p_l, q_l):
+    """Helper function to calculate the subsidy for a single price schedule."""
+    p_plus1 = jnp.append(p_l[1:], jnp.nan)
+    
+    # The fix is here: removed the incorrect slice from q_l
+    tier_subsidies = (p_plus1 - p_l)[:-1] * q_l
+    
+    d_end = jnp.cumsum(tier_subsidies)
+    return jnp.insert(d_end, 0, 0.0)
 
-def get_diff_payment(q_sum_hh, p_l, q_l, fc_l):
+def get_diff_payment(q_sum_hh, p_l, q_l):
+    """
+    Calculates the differential payment (inframarginal subsidy) for a given tariff,
+    handling both the regular and CAP policy scenarios.
+    """
+    # 1. Determine which tier the consumer is in.
     k = get_k_jitted(q_sum_hh, q_l)
-    q_l = jnp.insert(q_l, 0, 0)
-    diff_payment = jnp.cumsum(jnp.multiply((p_l - p_l0), q_l))
-    diff_payment = diff_payment[k]
-    diff_payment = jnp.multiply(diff_payment, de)
+
+    # 2. Calculate the price schedule under the CAP policy.
+    p_l_CAP = p_l - p_l0 + p_l0_CAP
+    
+    # 3. Calculate the cumulative subsidy for both scenarios using the helper.
+    d_end_regular = _calculate_subsidy(p_l, q_l)
+    d_end_cap = _calculate_subsidy(p_l_CAP, q_l)
+    
+    # 4. Select the correct subsidy value based on the consumer's tier.
+    diff_payment_regular = d_end_regular[k]
+    diff_payment_cap = d_end_cap[k]
+    
+    # 5. Choose the final result based on the CAP flag.
+    diff_payment = jnp.where(CAP == 1, diff_payment_cap, diff_payment_regular)
+    
     return diff_payment
+
+# Jitting the function
 get_diff_payment_jitted = jax.jit(get_diff_payment)
     
-def get_ev(q_sum_hh, p_l, q_l, fc_l,Z):
-    e = get_e_new_v_p0_jitted(q_sum_hh, p_l, q_l, fc_l, Z)
-    #diff_payment = get_diff_payment_jitted(q_sum_hh, p_l, q_l, fc_l)
-    ev = e - vi_0
+def get_ev_0(q_sum_hh, v_out, p_l = p_l0, q_l = q_l0, fc_l = fc_l0,Z = Z_current, ndv = NDVI):
+    e = get_e_new_v_p0_jitted(q_sum_hh,v_out)
+    #diff_payment = get_diff_payment_jitted(q_sum_hh, p_l0, q_l0)
+    unscaled_ev = e - vi_0
+    ev = unscaled_ev * de
+    return ev
+get_ev_0_jitted = jax.jit(get_ev_0)
+
+ev_0 = get_ev_0_jitted(q_sum_hh0, cs_0)
+
+def get_ev(q_sum_hh, v_out, p_l = p_l0, q_l = q_l0, fc_l = fc_l0,Z = Z_current, ndv = NDVI):
+    e = get_e_new_v_p0_jitted(q_sum_hh,v_out)
+    #diff_payment = get_diff_payment_jitted(q_sum_hh, p_l0, q_l0)
+    unscaled_ev = e - vi_0
+    ev = unscaled_ev * de - ev_0
     return ev
 get_ev_jitted = jax.jit(get_ev)
+
+
 
 imu_0 = jnp.power(jnp.maximum(jnp.multiply(d_k0, de) + I, 1e-16), rho)
 
@@ -1813,6 +1871,330 @@ def inverse_cara_jitted(y, a):
   # jnp.log requires positive argument, so we use -y.
   return -1.0/a * jnp.log(-y)
 
+#################################################
+####### Primary Result for Intuition ###########
+#################################################
+
+def scale_sd_non_parametric(arr, scale_factor):
+    """
+    Scales the spread (variability) of a non-normally distributed array
+    non-parametrically by scaling deviations from the median.
+
+    Args:
+        arr (jnp.ndarray): A 1D JAX numpy array of data.
+        scale_factor (float): The factor by which to scale the deviations
+                               from the median.
+
+    Returns:
+        jnp.ndarray: A new array with adjusted spread.
+    """
+    # Ensure the input is a JAX array. If it's already jnp.ndarray, this does nothing.
+    # If it's a regular numpy array, it converts it.
+    if not isinstance(arr, jnp.ndarray):
+        arr = jnp.array(arr)
+
+    # Calculate the median as the central tendency
+    median_val = jnp.median(arr)
+
+    # Calculate deviations from the median
+    deviations = arr - median_val
+
+    # Scale the deviations
+    scaled_deviations = deviations * scale_factor
+
+    # Add the median back to get the scaled values
+    scaled_arr = median_val + scaled_deviations
+
+    # Handle potential negative values (clip at zero for precipitation data)
+    # JAX arrays are immutable, so direct assignment like scaled_arr[condition] = value is not allowed.
+    # Use jnp.where for conditional element-wise selection.
+    scaled_arr = jnp.where(scaled_arr < 0, 0.0, scaled_arr) # Use 0.0 to maintain float type
+
+    return scaled_arr
+
+scale_sd_non_parametric_jitted = jax.jit(scale_sd_non_parametric)
+
+Z_step = Z_current.copy()  # Preserve original structure
+Z_step = Z_step.at[:,2 ].set(scale_sd_non_parametric_jitted(Z_step[:, 2], 0.75))
+Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
+
+plt.xlim(0, 12)
+plt.ylim(0, 350000)
+#plt.hist(Z_current[:, 2], bins=30, alpha=0.7, label='Status Quo')
+plt.hist(Z_step[:, 2], bins=30, alpha=0.7, label='High Variance')
+# Adding labels and title for clarity
+plt.xlabel('Precipitation (Inches)')
+plt.ylabel('Frequency')
+plt.title('')
+plt.legend()
+plt.grid(True)
+#plt.show()
+
+# Saving the plot to a file
+plt.savefig('weather/pics/z_high_histogram.png')
+
+#### Price Unchanged
+
+q_sum_hh0 = get_q_sum_hh_jitted(p_l0, q_l0, fc_l0, Z_current, NDVI)
+q_hh0 = q_sum_hh0/sim
+r_0 = from_q_to_r_jitted(q_sum_hh0, p_l0, q_l0, fc_l0)
+cs_0 = get_v_out_jitted(q_sum_hh0, p_l0, q_l0, fc_l0, Z_current, NDVI)
+ev_0= get_ev_jitted(q_sum_hh0, cs_0)
+
+### In dry condition
+
+Z_step = Z_current.copy()  # Preserve original structure
+#Z_step = Z_history.copy()  # Preserve original structure
+Z_step = Z_current.at[:, 2].add(-0.25)  # Modify slice (columns 3)
+Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
+
+q_sum_hh0_dry = get_q_sum_hh_jitted(p_l0, q_l0, fc_l0, Z_step, NDVI)
+q_hh0_dry = q_sum_hh0_dry/sim
+r_0_dry = from_q_to_r_jitted(q_sum_hh0_dry, p_l0, q_l0, fc_l0)
+cs_0_dry = get_v_out_jitted(q_sum_hh0_dry, p_l0, q_l0, fc_l0, Z_step, NDVI)
+ev_0_dry= get_ev_jitted(q_sum_hh0_dry, cs_0_dry)
+
+### In wet condition
+
+Z_step = Z_current.copy()  # Preserve original structure
+#Z_step = Z_history.copy()  # Preserve original structure
+Z_step = Z_current.at[:, 2].add(0.25)  # Modify slice (columns 3)
+Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
+
+q_sum_hh0_wet = get_q_sum_hh_jitted(p_l0, q_l0, fc_l0, Z_step, NDVI)
+q_hh0_wet = q_sum_hh0_wet/sim
+r_0_wet = from_q_to_r_jitted(q_sum_hh0_wet, p_l0, q_l0, fc_l0)
+cs_0_wet = get_v_out_jitted(q_sum_hh0_wet, p_l0, q_l0, fc_l0, Z_step, NDVI)
+ev_0_wet= get_ev_jitted(q_sum_hh0_wet, cs_0_wet)
+
+### In low var condition
+
+Z_step = Z_current.copy()  # Preserve original structure
+Z_step = Z_step.at[:,2 ].set(scale_sd_non_parametric_jitted(Z_step[:, 2], 0.75))
+Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
+
+q_sum_hh0_low_var = get_q_sum_hh_jitted(p_l0, q_l0, fc_l0, Z_step, NDVI)
+q_hh0_low_var = q_sum_hh0_low_var/sim
+r_0_low_var = from_q_to_r_jitted(q_sum_hh0_low_var, p_l0, q_l0, fc_l0)
+cs_0_low_var = get_v_out_jitted(q_sum_hh0_low_var, p_l0, q_l0, fc_l0, Z_step, NDVI)
+ev_0_low_var= get_ev_jitted(q_sum_hh0_low_var, cs_0_low_var)
+
+### In high var condition
+
+Z_step = Z_current.copy()  # Preserve original structure
+Z_step = Z_step.at[:,2 ].set(scale_sd_non_parametric_jitted(Z_step[:, 2], 1.25))
+Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
+
+q_sum_hh0_high_var = get_q_sum_hh_jitted(p_l0, q_l0, fc_l0, Z_step, NDVI)
+q_hh0_high_var = q_sum_hh0_high_var/sim
+r_0_high_var = from_q_to_r_jitted(q_sum_hh0_high_var, p_l0, q_l0, fc_l0)
+cs_0_high_var = get_v_out_jitted(q_sum_hh0_high_var, p_l0, q_l0, fc_l0, Z_step, NDVI)
+ev_0_high_var= get_ev_jitted(q_sum_hh0_high_var, cs_0_high_var)
+
+# Convert results to DataFrame
+intui_0_df = pd.DataFrame({
+    "q_1": q_hh0,
+    "r_1": r_0,
+    "cs_1": cs_0,
+    "ev_1": ev_0,
+    "q_dry": q_hh0_dry,
+    "r_dry": r_0_dry,
+    "cs_dry": cs_0_dry,
+    "ev_dry": ev_0_dry,
+    "q_wet": q_hh0_wet,
+    "r_wet": r_0_wet,
+    "cs_wet": cs_0_wet,
+    "ev_wet": ev_0_wet,
+    "q_low_var": q_hh0_low_var,
+    "r_low_var": r_0_low_var,
+    "cs_low_var": cs_0_low_var,
+    "ev_low_var": ev_0_low_var,
+    "q_high_var": q_hh0_high_var,
+    "r_high_var": r_0_high_var,
+    "cs_high_var": cs_0_high_var,
+    "ev_high_var": ev_0_high_var,
+})
+
+intui_0_df.to_csv("preliminary_intuition/status_quo.csv", index=False)
+
+#### Change the lowest tier, lowest tier marginal price increase by $1
+
+p_l1 = jnp.array([ 4.09,  5.01,  8.54, 12.9 , 14.41])
+
+q_sum_hh1 = get_q_sum_hh_jitted(p_l1, q_l0, fc_l0, Z_current, NDVI)
+q_hh1 = q_sum_hh1/sim
+r_1 = from_q_to_r_jitted(q_sum_hh1, p_l1, q_l0, fc_l0)
+cs_1 = get_v_out_jitted(q_sum_hh1, p_l1, q_l0, fc_l0, Z_current, NDVI)
+ev_1= get_ev_jitted(q_sum_hh1, cs_1)
+
+### In dry condition
+
+Z_step = Z_current.copy()  # Preserve original structure
+#Z_step = Z_history.copy()  # Preserve original structure
+Z_step = Z_current.at[:, 2].add(-0.25)  # Modify slice (columns 3)
+Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
+
+q_sum_hh1_dry = get_q_sum_hh_jitted(p_l1, q_l0, fc_l0, Z_step, NDVI)
+q_hh1_dry = q_sum_hh1_dry/sim
+r_1_dry = from_q_to_r_jitted(q_sum_hh1_dry, p_l1, q_l0, fc_l0)
+cs_1_dry = get_v_out_jitted(q_sum_hh1_dry, p_l1, q_l0, fc_l0, Z_step, NDVI)
+ev_1_dry= get_ev_jitted(q_sum_hh1_dry, cs_1_dry)
+
+### In wet condition
+
+Z_step = Z_current.copy()  # Preserve original structure
+#Z_step = Z_history.copy()  # Preserve original structure
+Z_step = Z_current.at[:, 2].add(0.25)  # Modify slice (columns 3)
+Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
+
+q_sum_hh1_wet = get_q_sum_hh_jitted(p_l1, q_l0, fc_l0, Z_step, NDVI)
+q_hh1_wet = q_sum_hh1_wet/sim
+r_1_wet = from_q_to_r_jitted(q_sum_hh1_wet, p_l1, q_l0, fc_l0)
+cs_1_wet = get_v_out_jitted(q_sum_hh1_wet, p_l1, q_l0, fc_l0, Z_step, NDVI)
+ev_1_wet= get_ev_jitted(q_sum_hh1_wet, cs_1_wet)
+
+### In low var condition
+
+Z_step = Z_current.copy()  # Preserve original structure
+Z_step = Z_step.at[:,2 ].set(scale_sd_non_parametric_jitted(Z_step[:, 2], 0.75))
+Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
+
+q_sum_hh1_low_var = get_q_sum_hh_jitted(p_l1, q_l0, fc_l0, Z_step, NDVI)
+q_hh1_low_var = q_sum_hh1_low_var/sim
+r_1_low_var = from_q_to_r_jitted(q_sum_hh1_low_var, p_l1, q_l0, fc_l0)
+cs_1_low_var = get_v_out_jitted(q_sum_hh1_low_var, p_l1, q_l0, fc_l0, Z_step, NDVI)
+ev_1_low_var= get_ev_jitted(q_sum_hh1_low_var, cs_1_low_var)
+
+### In high var condition
+
+Z_step = Z_current.copy()  # Preserve original structure
+Z_step = Z_step.at[:,2 ].set(scale_sd_non_parametric_jitted(Z_step[:, 2], 1.25))
+Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
+
+q_sum_hh1_high_var = get_q_sum_hh_jitted(p_l1, q_l0, fc_l0, Z_step, NDVI)
+q_hh1_high_var = q_sum_hh1_high_var/sim
+r_1_high_var = from_q_to_r_jitted(q_sum_hh1_high_var, p_l1, q_l0, fc_l0)
+cs_1_high_var = get_v_out_jitted(q_sum_hh1_high_var, p_l1, q_l0, fc_l0, Z_step, NDVI)
+ev_1_high_var= get_ev_jitted(q_sum_hh1_high_var, cs_1_high_var)
+
+# Convert results to DataFrame
+intui_1_df = pd.DataFrame({
+    "q_1": q_hh1,
+    "r_1": r_1,
+    "cs_1": cs_1,
+    "ev_1": ev_1,
+    "q_dry": q_hh1_dry,
+    "r_dry": r_1_dry,
+    "cs_dry": cs_1_dry,
+    "ev_dry": ev_1_dry,
+    "q_wet": q_hh1_wet,
+    "r_wet": r_1_wet,
+    "cs_wet": cs_1_wet,
+    "ev_wet": ev_1_wet,
+    "q_low_var": q_hh1_low_var,
+    "r_low_var": r_1_low_var,
+    "cs_low_var": cs_1_low_var,
+    "ev_low_var": ev_1_low_var,
+    "q_high_var": q_hh1_high_var,
+    "r_high_var": r_1_high_var,
+    "cs_high_var": cs_1_high_var,
+    "ev_high_var": ev_1_high_var,
+})
+
+intui_1_df.to_csv("preliminary_intuition/lowest_tier_increase_1.csv", index=False)
+
+
+
+
+#### Change the highest tier, highest tier marginal price increase by $1
+
+p_l2 = jnp.array([ 3.09,  5.01,  8.54, 12.9 , 15.41])
+
+q_sum_hh2 = get_q_sum_hh_jitted(p_l2, q_l0, fc_l0, Z_current, NDVI)
+q_hh2 = q_sum_hh2/sim
+r_2 = from_q_to_r_jitted(q_sum_hh2, p_l2, q_l0, fc_l0)
+cs_2 = get_v_out_jitted(q_sum_hh2, p_l2, q_l0, fc_l0, Z_current, NDVI)
+ev_2= get_ev_jitted(q_sum_hh2, cs_2)
+
+### In dry condition
+
+Z_step = Z_current.copy()  # Preserve original structure
+#Z_step = Z_history.copy()  # Preserve original structure
+Z_step = Z_current.at[:, 2].add(-0.25)  # Modify slice (columns 3)
+Z_step = jnp.maximum(Z_step, jnp.array(1e-26, dtype=jnp.float32))
+
+q_sum_hh2_dry = get_q_sum_hh_jitted(p_l2, q_l0, fc_l0, Z_step, NDVI)
+q_hh2_dry = q_sum_hh2_dry/sim
+r_2_dry = from_q_to_r_jitted(q_sum_hh2_dry, p_l2, q_l0, fc_l0)
+cs_2_dry = get_v_out_jitted(q_sum_hh2_dry, p_l2, q_l0, fc_l0, Z_step, NDVI)
+ev_2_dry= get_ev_jitted(q_sum_hh2_dry, cs_2_dry)
+
+### In wet condition
+
+Z_step = Z_current.copy()  # Preserve original structure
+#Z_step = Z_history.copy()  # Preserve original structure
+Z_step = Z_current.at[:, 2].add(0.25)  # Modify slice (columns 3)
+Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
+
+q_sum_hh2_wet = get_q_sum_hh_jitted(p_l2, q_l0, fc_l0, Z_step, NDVI)
+q_hh2_wet = q_sum_hh2_wet/sim
+r_2_wet = from_q_to_r_jitted(q_sum_hh2_wet, p_l2, q_l0, fc_l0)
+cs_2_wet = get_v_out_jitted(q_sum_hh2_wet, p_l2, q_l0, fc_l0, Z_step, NDVI)
+ev_2_wet= get_ev_jitted(q_sum_hh2_wet, cs_2_wet)
+
+### In low var condition
+
+Z_step = Z_current.copy()  # Preserve original structure
+Z_step = Z_step.at[:,2 ].set(scale_sd_non_parametric_jitted(Z_step[:, 2], 0.75))
+Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
+
+q_sum_hh2_low_var = get_q_sum_hh_jitted(p_l2, q_l0, fc_l0, Z_step, NDVI)
+q_hh2_low_var = q_sum_hh2_low_var/sim
+r_2_low_var = from_q_to_r_jitted(q_sum_hh2_low_var, p_l2, q_l0, fc_l0)
+cs_2_low_var = get_v_out_jitted(q_sum_hh2_low_var, p_l2, q_l0, fc_l0, Z_step, NDVI)
+ev_2_low_var= get_ev_jitted(q_sum_hh2_low_var, cs_2_low_var)
+
+### In high var condition
+
+Z_step = Z_current.copy()  # Preserve original structure
+Z_step = Z_step.at[:,2 ].set(scale_sd_non_parametric_jitted(Z_step[:, 2], 1.25))
+Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
+
+q_sum_hh2_high_var = get_q_sum_hh_jitted(p_l2, q_l0, fc_l0, Z_step, NDVI)
+q_hh2_high_var = q_sum_hh2_high_var/sim
+r_2_high_var = from_q_to_r_jitted(q_sum_hh2_high_var, p_l2, q_l0, fc_l0)
+cs_2_high_var = get_v_out_jitted(q_sum_hh2_high_var, p_l2, q_l0, fc_l0, Z_step, NDVI)
+ev_2_high_var= get_ev_jitted(q_sum_hh2_high_var, cs_2_high_var)
+
+# Convert results to DataFrame
+intui_2_df = pd.DataFrame({
+    "q_1": q_hh2,
+    "r_1": r_2,
+    "cs_1": cs_2,
+    "ev_1": ev_2,
+    "q_dry": q_hh2_dry,
+    "r_dry": r_2_dry,
+    "cs_dry": cs_2_dry,
+    "ev_dry": ev_2_dry,
+    "q_wet": q_hh2_wet,
+    "r_wet": r_2_wet,
+    "cs_wet": cs_2_wet,
+    "ev_wet": ev_2_wet,
+    "q_low_var": q_hh2_low_var,
+    "r_low_var": r_2_low_var,
+    "cs_low_var": cs_2_low_var,
+    "ev_low_var": ev_2_low_var,
+    "q_high_var": q_hh2_high_var,
+    "r_high_var": r_2_high_var,
+    "cs_high_var": cs_2_high_var,
+    "ev_high_var": ev_2_high_var,
+})
+
+intui_2_df.to_csv("preliminary_intuition/highest_tier_increase_1.csv", index=False)
+
+
+
+
 ########################
 #### Revenue Conditions #####
 ########################
@@ -1825,7 +2207,7 @@ r0_soft_constraint = 0.8*r0_sum_filtered
 
 log_r0_mean_filtered = jnp.log(r0_sum_filtered/12)
 
-gamma = 0.3
+gamma = 0.5
 
 a_val = 1e-6
 
@@ -1966,11 +2348,16 @@ def inverse_crra(y, gamma):
 
 inverse_crra_jitted = jax.jit(inverse_crra)
 
-def get_result (p_l, q_l, fc_l, Z):
-    q_sum_hh = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z)
+###############################################################
+######### No Monte Carlo #####################
+###############################################################
+
+def get_result (p_l, q_l, fc_l, Z, ndv):
+    q_sum_hh = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z,ndv)
     r = from_q_to_r_jitted(q_sum_hh, p_l, q_l, fc_l)
     r_sum_filtered = nansum_ignore_nan_inf_jitted(r)
-    ev = get_ev_jitted(q_sum_hh, p_l, q_l, fc_l, Z)
+    cs = get_v_out_jitted(q_sum_hh, p_l, q_l, fc_l, Z, ndv)
+    ev = get_ev_jitted(q_sum_hh, cs)
     ev_ratio_fullyear = nansum_ignore_nan_inf_jitted(jnp.divide(ev, I))
     loss = -1 * lambda_* loss_function_jitted(r_sum_filtered - r0_sum_filtered)
     result =ev_ratio_fullyear + loss
@@ -1978,8 +2365,8 @@ def get_result (p_l, q_l, fc_l, Z):
 
 get_result_jitted = jax.jit(get_result)
 
-def get_result_crra (p_l, q_l, fc_l, Z):
-    q_sum_hh = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z)
+def get_result_crra (p_l, q_l, fc_l, Z, ndv):
+    q_sum_hh = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z, ndv)
     r = from_q_to_r_jitted(q_sum_hh, p_l, q_l, fc_l)
     # Apply mask after slicing
     monthly_sum_r = jnp.array([
@@ -1989,7 +2376,8 @@ def get_result_crra (p_l, q_l, fc_l, Z):
     crra_r_monthly = crra_jitted(monthly_sum_r, gamma) # Array of f(R_m) (shape num_months,)
     crra_r_monthly_avg = jnp.mean(crra_r_monthly) # Average of f(R_m) (scalar)
     ce_avg_monthly_revenue = inverse_crra_jitted(crra_r_monthly_avg, gamma) # CE(bar{R}_month) (dollars/month)
-    ev = get_ev_jitted(q_sum_hh, p_l, q_l, fc_l, Z)
+    cs = get_v_out_jitted(q_sum_hh, p_l, q_l, fc_l, Z, ndv)
+    ev = get_ev_jitted(q_sum_hh, cs)
     ev_ratio_fullyear = nansum_ignore_nan_inf_jitted(jnp.divide(ev, I))
     loss = -1* lambda_*loss_function_jitted((12.0 * ce_avg_monthly_revenue) - r0_sum_filtered) # max(0, C_total_val - 12 * CE(bar{R}_month)) (dollars)
     result =ev_ratio_fullyear + loss
@@ -1997,17 +2385,17 @@ def get_result_crra (p_l, q_l, fc_l, Z):
 
 get_result_crra_jitted = jax.jit(get_result_crra)
 
-
-def get_result_quadratic (p_l, q_l, fc_l, Z):
-    q_sum_hh = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z)
+def get_result_quadratic (p_l, q_l, fc_l, Z, ndv):
+    q_sum_hh = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z, ndv)
     r = from_q_to_r_jitted(q_sum_hh, p_l, q_l, fc_l)
     monthly_sum_r = jnp.array([
         (r[padded_month_indices[i]] * mask[i]).sum()
         for i in range(12)
     ])
     loss = -1 * lambda_*jnp.sum(loss_function_quadratic_jitted(monthly_sum_r - r0_sum_filtered/12))
-    ev = get_ev_jitted(q_sum_hh, p_l, q_l, fc_l, Z)
-    #cs = get_v_out(q_sum_hh, p_l, q_l, fc_l, Z)
+    cs = get_v_out_jitted(q_sum_hh, p_l, q_l, fc_l, Z, ndv)
+    ev = get_ev_jitted(q_sum_hh, cs)
+    #cs = get_v_out(q_sum_hh, p_l, q_l, fc_l, Z, ndv)
     #cv = get_compensating_variation_jitted(cs)
     ev_ratio_fullyear = nansum_ignore_nan_inf_jitted(jnp.divide(ev, I))
     result =ev_ratio_fullyear + loss
@@ -2015,8 +2403,8 @@ def get_result_quadratic (p_l, q_l, fc_l, Z):
 
 get_result_quadratic_jitted = jax.jit(get_result_quadratic)
 
-def get_result_cara (p_l, q_l, fc_l, Z):
-    q_sum_hh = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z)
+def get_result_cara (p_l, q_l, fc_l, Z, ndv):
+    q_sum_hh = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z. ndv)
     r = from_q_to_r_jitted(q_sum_hh, p_l, q_l, fc_l)
     # Apply mask after slicing
     monthly_sum_r = jnp.array([
@@ -2030,7 +2418,8 @@ def get_result_cara (p_l, q_l, fc_l, Z):
     # Calculate Empirical Certainty Equivalent of Average Monthly Revenue (dollars/month)
     # CE(bar{R}_month) = f^{-1}(Average of f(R_m))
     ce_avg_monthly_revenue = inverse_cara_jitted(cara_r_monthly_avg, a_val) # CE(bar{R}_month) (dollars/month)
-    ev = get_ev_jitted(q_sum_hh, p_l, q_l, fc_l, Z)
+    cs = get_v_out_jitted(q_sum_hh, p_l, q_l, fc_l, Z, ndv)
+    ev = get_ev_jitted(q_sum_hh, cs)
     ev_ratio_fullyear = nansum_ignore_nan_inf_jitted(jnp.divide(ev, I))
     ce_monthly_shortfall_penalty_amount = loss_function_jitted((12.0 * ce_avg_monthly_revenue) - r0_sum_filtered) # max(0, C_total_val - 12 * CE(bar{R}_month)) (dollars)
     # Total penalty term (dollars)
@@ -2140,8 +2529,29 @@ def get_result_monte_carlo(p_l, q_l, fc_l, Z_original,
     del monte_carlo_results_per_sample
     return average_mc_result
 
+# The single Monte Carlo run logic
+def _single_mc_run_get_result_core(param_pl_ql_fcl, Z_single_sample_full_array):
+    """
+    This contains the original core logic of get_result, but operates on a single
+    perturbed Z sample. It returns the 'result'.
+    """
+    p_l, q_l, fc_l = param_pl_ql_fcl # Unpack parameters for clarity
+
+    q_sum_hh = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z_single_sample_full_array)
+    r = from_q_to_r_jitted(q_sum_hh, p_l, q_l, fc_l)
+    r_sum_filtered = nansum_ignore_nan_inf_jitted(r)
+
+    cs = get_v_out_jitted(q_sum_hh, p_l, q_l, fc_l, Z_single_sample_full_array)
+    ev = get_ev_jitted(q_sum_hh, cs)
+    ev_ratio_fullyear = nansum_ignore_nan_inf_jitted(jnp.divide(ev, I))
+
+    loss = -1 * lambda_ * loss_function_jitted(r_sum_filtered - r0_sum_filtered)
+    result = ev_ratio_fullyear + loss
+    return result
+
+
 # The single Monte Carlo run core logic for get_result_crra
-def _single_mc_run_get_result_crra_core(param_pl_ql_fcl, Z_single_sample_full_array,
+def _single_mc_run_get_result_crra_core(param_pl_ql_fcl, Z_single_sample_full_array,  
                                         padded_month_indices_arg, mask_arg, gamma_arg):
     p_l, q_l, fc_l = param_pl_ql_fcl
 
@@ -2210,7 +2620,6 @@ def _single_mc_run_get_result_crra_combined_core(param_pl_ql_fcl, Z_single_sampl
 
     result = ev_ratio_fullyear, crra_r_monthly
     return result
-
 
 
 # NEW FUNCTION: Step 1 - Generate all perturbed Z samples
@@ -2285,26 +2694,25 @@ def get_mc_result_crra_from_perturbed_Z(p_l: jax.Array,
 
     # Store p_l, q_l, fc_l in a tuple/array to pass around easily
     param_for_core = (p_l, q_l, fc_l)
-    #monte_carlo_results_per_sample = jax.vmap(_single_mc_run_get_result_crra_core, in_axes=(None, 0))(
-    #    param_for_core, Z_perturbed_samples_batch,
-    #    padded_month_indices_param, mask_param, gamma_param
-    #)
-    
-    monte_carlo_results_per_sample_ev, monte_carlo_results_per_sample_rm = jax.vmap(_single_mc_run_get_result_crra_combined_core, in_axes=(None, 0, None, None, None))(
+    monte_carlo_results_per_sample = jax.vmap(_single_mc_run_get_result_crra_core, in_axes=(None, 0, None, None, None))(
         param_for_core, Z_perturbed_samples_batch,
         padded_month_indices_param, mask_param, gamma_param
     )
     
-    crra_r_monthly_avg = jnp.mean(monte_carlo_results_per_sample_rm)
-    ce_avg_monthly_revenue = inverse_crra_jitted(crra_r_monthly_avg, gamma_param)
+    #monte_carlo_results_per_sample_ev, monte_carlo_results_per_sample_rm = jax.vmap(_single_mc_run_get_result_crra_combined_core, in_axes=(None, 0, None, None, None))(
+    #    param_for_core, Z_perturbed_samples_batch,
+    #    padded_month_indices_param, mask_param, gamma_param
+    #)
+    
+    #crra_r_monthly_avg = jnp.mean(monte_carlo_results_per_sample_rm)
+    #ce_avg_monthly_revenue = inverse_crra_jitted(crra_r_monthly_avg, gamma_param)
 
-    loss = -1 * lambda_ * loss_function_jitted((12.0 * ce_avg_monthly_revenue) - r0_sum_filtered)
+    #loss = -1 * lambda_ * loss_function_jitted((12.0 * ce_avg_monthly_revenue) - r0_sum_filtered)
     
     # Take the average of all Monte Carlo results
-    average_mc_result = jnp.mean(monte_carlo_results_per_sample_ev) + loss
-    del monte_carlo_results_per_sample_ev, monte_carlo_results_per_sample_rm
+    average_mc_result = jnp.mean(monte_carlo_results_per_sample)
+    #del monte_carlo_results_per_sample_ev, monte_carlo_results_per_sample_rm
     return average_mc_result
-
 
 
 param0 = jnp.array([3.09, 5.01-3.09, 8.54-5.01, 12.9-8.54, 14.41-12.9, 
@@ -2338,22 +2746,25 @@ def param_to_pq0 (param):
 param_to_pq0_jitted = jax.jit(param_to_pq0)
 
 
-def objective0(param, precomputed_Z_samples):
+def objective0(param, 
+               #precomputed_Z_samples
+               Z, ndv
+               ):
     param = jnp.maximum(param, 0.01)
     p_l, q_l, fc_l = param_to_pq0_jitted(param)
     #processed_Z = average_Z_jitted(Z)
     #del Z
-    #result = get_result_jitted(p_l, q_l, fc_l, processed_Z)
+    result = get_result_jitted(p_l, q_l, fc_l, Z, ndv)
     #result = get_result_monte_carlo(
     #    p_l, q_l, fc_l, processed_Z,
         #total_num_samples=100, # Fixed number of samples
         #log_std_dev_factor=0.1 # Example noise level
     #)
-    result = get_mc_result_from_perturbed_Z(
-        p_l, q_l, fc_l, precomputed_Z_samples,
+    #result = get_mc_result_from_perturbed_Z(
+     #   p_l, q_l, fc_l, precomputed_Z_samples,
         #total_num_samples=100, # Fixed number of samples
         #log_std_dev_factor=0.1 # Example noise level
-    )
+    #)
     result = -1 * result
     return result
 objective0_jitted = jax.jit(objective0)
@@ -2363,7 +2774,7 @@ def objective0_crra(param, precomputed_Z_samples):
     p_l, q_l, fc_l = param_to_pq0_jitted(param)
     #processed_Z = average_Z_jitted(Z)
     #del Z
-    #result = get_result_crra_jitted(p_l, q_l, fc_l, processed_Z)
+    #result = get_result_crra_jitted(p_l, q_l, fc_l, processed_Z, ndv)
     result = get_mc_result_crra_from_perturbed_Z(
         p_l, q_l, fc_l, precomputed_Z_samples,
         #total_num_samples=100, # Fixed number of samples
@@ -2373,17 +2784,17 @@ def objective0_crra(param, precomputed_Z_samples):
     return result
 objective0_crra_jitted = jax.jit(objective0_crra)
 
-def objective0_cara(param, Z):
+def objective0_cara(param, Z, ndv):
     param = jnp.maximum(param, 0.01)
     p_l, q_l, fc_l = param_to_pq0_jitted(param)
-    processed_Z = average_Z_jitted(Z)
-    del Z
-    result = get_result_cara_jitted(p_l, q_l, fc_l, processed_Z)
+    #processed_Z = average_Z_jitted(Z)
+    #del Z
+    result = get_result_cara_jitted(p_l, q_l, fc_l, Z, ndv)
     result = -1 * result
     return result
 objective0_cara_jitted = jax.jit(objective0_cara)
 
-def objective0_quadratic(param, Z):
+def objective0_quadratic(param, Z, ndv):
     param = jnp.maximum(param, 0.01)
     p_l, q_l, fc_l = param_to_pq0_jitted(param)
     #jax.debug.print("Current param {y}", y= jax.device_get(param))
@@ -2392,7 +2803,7 @@ def objective0_quadratic(param, Z):
     #result_low = get_result_jitted(p_l, q_l, fc_l, Z_low, lam)
     #result_high = get_result_jitted(p_l, q_l, fc_l, Z_high, lam)
     #result = (result_low + result_high)/2
-    result = get_result_quadratic_jitted(p_l, q_l, fc_l, processed_Z)
+    result = get_result_quadratic_jitted(p_l, q_l, fc_l, processed_Z, ndv)
     result = -1 * result
     #result = -1 * nansum_ignore_nan_inf_jitted(result)
     #result = -1 * sum_ignore_outliers_jitted(result)
@@ -2401,14 +2812,14 @@ def objective0_quadratic(param, Z):
     return result
 objective0_quadratic_jitted = jax.jit(objective0_quadratic)
 #r_benchmark = r0_soft_constraint
-def revenue_lower_bound_constraint(param, Z):
+def revenue_lower_bound_constraint(param, Z, ndv):
     p_l, q_l, fc_l = param_to_pq0_jitted(param)
     ## Take Average
-    processed_Z = average_Z_jitted(Z)
-    del Z
+    #processed_Z = average_Z_jitted(Z)
+    #del Z
     #max_prcp = jnp.max(processed_Z[:,2])
     #max_month = jnp.where(processed_Z[:,2] == max_prcp)[0]
-    q_sum_hh = get_q_sum_hh_jitted(p_l, q_l, fc_l, processed_Z)
+    q_sum_hh = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z, ndv)
     r = from_q_to_r_jitted(q_sum_hh, p_l, q_l, fc_l)
     del q_sum_hh
 
@@ -2465,14 +2876,14 @@ def revenue_lower_bound_constraint(param, Z):
 
 revenue_lower_bound_constraint_jitted = jax.jit(revenue_lower_bound_constraint)
 
-def revenue_lower_bound_crra_constraint(param, Z):
+def revenue_lower_bound_crra_constraint(param, Z, ndv):
     p_l, q_l, fc_l = param_to_pq0_jitted(param)
     ## Take Average
-    processed_Z = average_Z_jitted(Z)
-    del Z
+    #processed_Z = average_Z_jitted(Z)
+    #del Z
     #max_prcp = jnp.max(processed_Z[:,2])
     #max_month = jnp.where(processed_Z[:,2] == max_prcp)[0]
-    q_sum_hh = get_q_sum_hh_jitted(p_l, q_l, fc_l, processed_Z)
+    q_sum_hh = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z, ndv)
     r = from_q_to_r_jitted(q_sum_hh, p_l, q_l, fc_l)
     del q_sum_hh
     crra_r = crra_jitted(jnp.maximum(r, 1e-16), gamma) 
@@ -2484,8 +2895,8 @@ def revenue_lower_bound_crra_constraint(param, Z):
 
 revenue_lower_bound_crra_constraint_jitted = jax.jit(revenue_lower_bound_crra_constraint)
 
-def get_q_sum_sim_max(p_l, q_l, fc_l, Z):
-    log_q = cf_w_jitted(p_l, q_l, fc_l, Z)
+def get_q_sum_sim_max(p_l, q_l, fc_l, Z, ndv):
+    log_q = cf_w_jitted(p_l, q_l, fc_l, Z, ndv)
     q = jnp.exp(log_q)
     del log_q
     max_len = padded_month_indices.shape[1]  # Maximum possible entries in a month
@@ -2506,8 +2917,8 @@ def get_q_sum_sim_max(p_l, q_l, fc_l, Z):
     return total_q
 get_q_sum_sim_max_jitted = jax.jit(get_q_sum_sim_max)
 
-def get_q_sum_sim_month(p_l, q_l, fc_l, Z):
-    log_q = cf_w_jitted(p_l, q_l, fc_l, Z)
+def get_q_sum_sim_month(p_l, q_l, fc_l, Z, ndv):
+    log_q = cf_w_jitted(p_l, q_l, fc_l, Z, ndv)
     q = jnp.exp(log_q)
     del log_q
     max_len = padded_month_indices.shape[1]  # Maximum possible entries in a month
@@ -2554,20 +2965,20 @@ def get_mc_result_conserve_from_perturbed_Z(
     return result
 
 
-def conservation_constraint(param, Z):
+def conservation_constraint(param, Z, ndv):
     p_l, q_l, fc_l = param_to_pq0_jitted(param)
-    q_sum_sim = get_q_sum_sim_jitted(p_l, q_l, fc_l, Z)
+    q_sum_sim = get_q_sum_sim_jitted(p_l, q_l, fc_l, Z, ndv)
     result = conservation_condition_jitted(q_sum_sim, p_l, q_l, fc_l)
     del q_sum_sim
     return result
 
 conservation_constraint_jitted = jax.jit(conservation_constraint)
 
-def conservation_constraint_crra(param, Z):
+def conservation_constraint_crra(param, Z, ndv):
     p_l, q_l, fc_l = param_to_pq0_jitted(param)
-    processed_Z = average_Z_jitted(Z)
-    del Z
-    q_sum_sim_month = get_q_sum_sim_month_jitted(p_l, q_l, fc_l, processed_Z) # 12*sim dimension array
+    #processed_Z = average_Z_jitted(Z)
+    #del Z
+    q_sum_sim_month = get_q_sum_sim_month_jitted(p_l, q_l, fc_l, Z, ndv) # 12*sim dimension array
     result = conservation_condition_crra_jitted(q_sum_sim_month, p_l, q_l, fc_l)
     del q_sum_sim_month
     return result
@@ -2607,7 +3018,7 @@ param0_2 = jnp.array([3.09, 5.01-3.09, 8.54-5.01, 12.9-8.54, 14.41-12.9,
                     10.8-8.5, 16.5-10.8, 37-16.5
                     , 37-37
                     ])
-
+"""
 import jax
 from jax import config # <--- Add this line
 import jax.numpy as jnp
@@ -2627,6 +3038,337 @@ except ValueError:
 
 jax.profiler.start_server(9999)
 print("Started JAX profiler server on port 9999.")
+"""
+########################################
+######### Change Just From Weather ##########
+########################################
+
+input_NDVI = NDVI
+
+steps = jnp.arange(-0.25, 0.3, 0.05, dtype=jnp.float32)
+
+# Lists to store results
+pl_step_agg_results = []
+ql_step_agg_results = []
+fcl_step_agg_results = []
+r_step_agg_results = []
+cs_step_agg_results = []
+q_step_agg_results = []
+ev_step_agg_results = []
+cs_step_results = []
+q_step_results = []
+r_step_results = []
+ev_step_results = []
+error_log = []  # Store errors
+
+
+for step in steps:
+    try:
+        # Update Z_step with the current step
+        Z_step = Z_current.copy()  # Preserve original structure
+        #Z_step = Z_history.copy()  # Preserve original structure
+        Z_step = Z_current.at[:, 2].add(step)  # Modify slice (columns 3)
+        Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
+        
+        p_l, q_l, fc_l = p_l0, q_l0, fc_l0
+
+        # Process constraints
+        #processed_Z = average_Z_jitted(Z_step)
+        q_sum_hh_step = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z_step, input_NDVI)
+        r_step = from_q_to_r_jitted(q_sum_hh_step, p_l, q_l, fc_l)
+        r_step_agg = nansum_ignore_nan_inf_jitted(r_step) / 12
+        cs_step = get_v_out_jitted(q_sum_hh_step, p_l, q_l, fc_l, Z_step,input_NDVI)
+        cs_step_agg = nansum_ignore_nan_inf_jitted(cs_step) / 12
+        q_hh_step = q_sum_hh_step/sim
+        q_step_agg = nansum_ignore_nan_inf_jitted(q_hh_step) / 12
+        ev_step = get_ev_jitted(q_sum_hh_step, cs_step)
+        ev_step_agg = nansum_ignore_nan_inf_jitted(ev_step) / 12
+
+        # Append results
+        pl_step_agg_results.append(p_l)
+        ql_step_agg_results.append(q_l)
+        fcl_step_agg_results.append(fc_l)
+        r_step_agg_results.append(r_step_agg)
+        cs_step_agg_results.append(cs_step_agg)
+        q_step_agg_results.append(q_step_agg)
+        ev_step_agg_results.append(ev_step_agg)
+        cs_step_results.append(cs_step)
+        q_step_results.append(q_hh_step)
+        r_step_results.append(r_step)
+        ev_step_results.append(ev_step)
+
+
+    except ValueError as e:
+        error_log.append(str(e))  # Store error message
+        print(f"Error at step {step}: {e}")  # Optional: Print errors immediately
+
+# **Print all errors after the loop**
+if error_log:
+    print("\nErrors encountered during optimization:")
+    for err in error_log:
+        print(err)
+
+
+# Convert results to arrays for further processing
+pl_step_agg_results = jnp.array(pl_step_agg_results)
+pl_step_agg_results  = pl_step_agg_results.T
+pl_step_agg_results_df = pd.DataFrame(pl_step_agg_results)
+pl_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/sq_p_mean_pl.csv", index=False)
+del pl_step_agg_results, pl_step_agg_results_df
+
+ql_step_agg_results = jnp.array(ql_step_agg_results)
+ql_step_agg_results  = ql_step_agg_results.T
+ql_step_agg_results_df = pd.DataFrame(ql_step_agg_results)
+ql_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/sq_p_mean_ql.csv", index=False)
+del ql_step_agg_results, ql_step_agg_results_df
+
+fcl_step_agg_results = jnp.array(fcl_step_agg_results)
+fcl_step_agg_results  = fcl_step_agg_results.T
+fcl_step_agg_results_df = pd.DataFrame(fcl_step_agg_results)
+fcl_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/sq_p_mean_fcl.csv", index=False)
+del fcl_step_agg_results, fcl_step_agg_results_df
+
+r_step_agg_results = jnp.array(r_step_agg_results)
+r_step_agg_results_df = pd.DataFrame(r_step_agg_results)
+r_step_agg_results_df.to_csv("ramsey_welfare_result/sq_p_mean_r.csv", index=False)
+
+cs_step_agg_results = jnp.array(cs_step_agg_results)
+cs_step_agg_results_df = pd.DataFrame(cs_step_agg_results)
+cs_step_agg_results_df.to_csv("ramsey_welfare_result/sq_p_mean_cs.csv", index=False)
+
+q_step_agg_results = jnp.array(q_step_agg_results)
+q_step_agg_results_df = pd.DataFrame(q_step_agg_results)
+q_step_agg_results_df.to_csv("ramsey_welfare_result/sq_p_mean_q.csv", index=False)
+
+ev_step_agg_results = jnp.array(ev_step_agg_results)
+ev_step_agg_results_df = pd.DataFrame(ev_step_agg_results)
+ev_step_agg_results_df.to_csv("ramsey_welfare_result/sq_p_mean_ev.csv", index=False)
+
+cs_step_results = jnp.array(cs_step_results)
+cs_step_results=cs_step_results.T
+cs_step_results_df = pd.DataFrame(cs_step_results)
+cs_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/sq_p_mean_cs_steps.csv", index=False)
+del cs_step_results, cs_step_results_df
+
+q_step_results = jnp.array(q_step_results)
+q_step_results=q_step_results.T
+q_step_results_df = pd.DataFrame(q_step_results)
+q_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/sq_p_mean_q_steps.csv", index=False)
+del q_step_results, q_step_results_df
+
+r_step_results = jnp.array(r_step_results)
+r_step_results=r_step_results.T
+r_step_results_df = pd.DataFrame(r_step_results)
+r_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/sq_p_mean_r_steps.csv", index=False)
+del r_step_results, r_step_results_df
+
+ev_step_results = jnp.array(ev_step_results)
+ev_step_results=ev_step_results.T
+ev_step_results_df = pd.DataFrame(ev_step_results)
+ev_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/sq_p_mean_ev_steps.csv", index=False)
+del ev_step_results, ev_step_results_df
+
+#######################################
+#### Prepare Z for changing IQR ######
+######################################
+
+#### noted that the iqr in the demand model is iqr within month. This is not the focus of the research
+#### The research focus on the volatility across different month both within a year
+
+def scale_sd_non_parametric(arr, scale_factor):
+    """
+    Scales the spread (variability) of a non-normally distributed array
+    non-parametrically by scaling deviations from the median.
+
+    Args:
+        arr (jnp.ndarray): A 1D JAX numpy array of data.
+        scale_factor (float): The factor by which to scale the deviations
+                               from the median.
+
+    Returns:
+        jnp.ndarray: A new array with adjusted spread.
+    """
+    # Ensure the input is a JAX array. If it's already jnp.ndarray, this does nothing.
+    # If it's a regular numpy array, it converts it.
+    if not isinstance(arr, jnp.ndarray):
+        arr = jnp.array(arr)
+
+    # Calculate the median as the central tendency
+    median_val = jnp.median(arr)
+
+    # Calculate deviations from the median
+    deviations = arr - median_val
+
+    # Scale the deviations
+    scaled_deviations = deviations * scale_factor
+
+    # Add the median back to get the scaled values
+    scaled_arr = median_val + scaled_deviations
+
+    # Handle potential negative values (clip at zero for precipitation data)
+    # JAX arrays are immutable, so direct assignment like scaled_arr[condition] = value is not allowed.
+    # Use jnp.where for conditional element-wise selection.
+    scaled_arr = jnp.where(scaled_arr < 0, 0.0, scaled_arr) # Use 0.0 to maintain float type
+
+    return scaled_arr
+
+scale_sd_non_parametric_jitted = jax.jit(scale_sd_non_parametric)
+
+s_steps = jnp.arange(0.75, 1.25+0.05, 0.05, dtype=jnp.float32)
+
+pl_step_agg_results_iqr = []
+ql_step_agg_results_iqr = []
+fcl_step_agg_results_iqr = []
+r_step_agg_results_iqr = []
+cs_step_agg_results_iqr = []
+q_step_agg_results_iqr = []
+ev_step_agg_results_iqr = []
+cs_step_results_iqr = []
+q_step_results_iqr = []
+r_step_results_iqr = []
+ev_step_results_iqr = []
+error_log_var = []
+
+for step in s_steps:
+    try:
+        # Update Z_step with the current step
+        #Z_step = Z_history.copy()  # Preserve original structure
+        Z_step = Z_current.copy()  # Preserve original structure
+        Z_step = Z_step.at[:,2 ].set(scale_sd_non_parametric_jitted(Z_step[:, 2], step))
+        Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
+        
+        p_l, q_l, fc_l = p_l0, q_l0, fc_l0
+
+        # Process constraints
+        #processed_Z = average_Z_jitted(Z_step)
+        q_sum_hh_step = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z_step, input_NDVI)
+        r_step = from_q_to_r_jitted(q_sum_hh_step, p_l, q_l, fc_l)
+        r_step_agg = nansum_ignore_nan_inf_jitted(r_step) / 12
+        cs_step = get_v_out_jitted(q_sum_hh_step, p_l, q_l, fc_l, Z_step, input_NDVI)
+        cs_step_agg = nansum_ignore_nan_inf_jitted(cs_step) / 12
+        q_hh_step = q_sum_hh_step/sim
+        q_step_agg = nansum_ignore_nan_inf_jitted(q_hh_step) / 12
+        ev_step = get_ev_jitted(q_sum_hh_step, cs_step)
+        ev_step_agg = nansum_ignore_nan_inf_jitted(ev_step) / 12
+
+        # Append results
+        pl_step_agg_results_iqr.append(p_l)
+        ql_step_agg_results_iqr.append(q_l)
+        fcl_step_agg_results_iqr.append(fc_l)
+        r_step_agg_results_iqr.append(r_step_agg)
+        cs_step_agg_results_iqr.append(cs_step_agg)
+        q_step_agg_results_iqr.append(q_step_agg)
+        ev_step_agg_results_iqr.append(ev_step_agg)
+        cs_step_results_iqr.append(cs_step)
+        q_step_results_iqr.append(q_hh_step)
+        r_step_results_iqr.append(r_step)
+        ev_step_results_iqr.append(ev_step)
+
+        # Clean up memory
+        del q_sum_hh_step, r_step, cs_step, q_hh_step, ev_step
+        gc.collect()
+
+    except ValueError as e:
+        error_log_var.append(str(e))  # Store error message
+        print(f"Error at step {step}: {e}")  # Optional: Print errors immediately
+
+# **Print all errors after the loop**
+if error_log_var:
+    print("\nErrors encountered during optimization:")
+    for err in error_log_var:
+        print(err)
+        
+# Convert results to arrays for further processing
+pl_step_agg_results_iqr = jnp.array(pl_step_agg_results_iqr)
+pl_step_agg_results_iqr  = pl_step_agg_results_iqr.T
+pl_step_agg_results_iqr_df = pd.DataFrame(pl_step_agg_results_iqr)
+pl_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/sq_p_var_pl.csv", index=False)
+del pl_step_agg_results_iqr, pl_step_agg_results_iqr_df
+
+ql_step_agg_results_iqr = jnp.array(ql_step_agg_results_iqr)
+ql_step_agg_results_iqr  = ql_step_agg_results_iqr.T
+ql_step_agg_results_iqr_df = pd.DataFrame(ql_step_agg_results_iqr)
+ql_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/sq_p_var_ql.csv", index=False)
+del ql_step_agg_results_iqr, ql_step_agg_results_iqr_df
+
+fcl_step_agg_results_iqr = jnp.array(fcl_step_agg_results_iqr)
+fcl_step_agg_results_iqr  = fcl_step_agg_results_iqr.T
+fcl_step_agg_results_iqr_df = pd.DataFrame(fcl_step_agg_results_iqr)
+fcl_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/sq_p_var_fcl.csv", index=False)
+del fcl_step_agg_results_iqr, fcl_step_agg_results_iqr_df
+
+r_step_agg_results_iqr = jnp.array(r_step_agg_results_iqr)
+r_step_agg_results_iqr_df = pd.DataFrame(r_step_agg_results_iqr)
+r_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/sq_p_var_r.csv", index=False)
+
+cs_step_agg_results_iqr = jnp.array(cs_step_agg_results_iqr)
+cs_step_agg_results_iqr_df = pd.DataFrame(cs_step_agg_results_iqr)
+cs_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/sq_p_var_cs.csv", index=False)
+
+q_step_agg_results_iqr = jnp.array(q_step_agg_results_iqr)
+q_step_agg_results_iqr_df = pd.DataFrame(q_step_agg_results_iqr)
+q_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/sq_p_var_q.csv", index=False)
+
+ev_step_agg_results_iqr = jnp.array(ev_step_agg_results_iqr)
+ev_step_agg_results_iqr_df = pd.DataFrame(ev_step_agg_results_iqr)
+ev_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/sq_p_var_ev.csv", index=False)
+
+cs_step_results_iqr = jnp.array(cs_step_results_iqr)
+cs_step_results_iqr=cs_step_results_iqr.T
+cs_step_results_iqr_df = pd.DataFrame(cs_step_results_iqr)
+cs_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/sq_p_var_cs_steps.csv", index=False)
+del cs_step_results_iqr, cs_step_results_iqr_df
+
+q_step_results_iqr = jnp.array(q_step_results_iqr)
+q_step_results_iqr=q_step_results_iqr.T
+q_step_results_iqr_df = pd.DataFrame(q_step_results_iqr)
+q_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/sq_p_var_q_steps.csv", index=False)
+del q_step_results_iqr, q_step_results_iqr_df
+
+r_step_results_iqr = jnp.array(r_step_results_iqr)
+r_step_results_iqr=r_step_results_iqr.T
+r_step_results_iqr_df = pd.DataFrame(r_step_results_iqr)
+r_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/sq_p_var_r_steps.csv", index=False)
+del r_step_results_iqr, r_step_results_iqr_df
+
+ev_step_results_iqr = jnp.array(ev_step_results_iqr)
+ev_step_results_iqr=ev_step_results_iqr.T
+ev_step_results_iqr_df = pd.DataFrame(ev_step_results_iqr)
+ev_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/sq_p_var_ev_steps.csv", index=False)
+del ev_step_results_iqr, ev_step_results_iqr_df
+
+# Convert results to DataFrame
+results_df = pd.DataFrame({
+    "steps": steps,
+    "s_steps": s_steps,
+    "mean_r": r_step_agg_results,
+    "mean_cs": cs_step_agg_results,
+    "mean_q": q_step_agg_results,
+    "mean_ev": ev_step_agg_results,
+    "var_r": r_step_agg_results_iqr,
+    "var_cs": cs_step_agg_results_iqr,
+    "var_q": q_step_agg_results_iqr,
+    "var_ev": ev_step_agg_results_iqr,
+})
+
+results_df['mean_r_diff'] = (results_df['mean_r'] -r_agg_0)/r_agg_0
+results_df['var_r_diff'] = (results_df['var_r'] -r_agg_0)/r_agg_0
+results_df['mean_q_diff'] = (results_df['mean_q'] -q_agg_0)/q_agg_0
+results_df['var_q_diff'] = (results_df['var_q'] -q_agg_0)/q_agg_0
+results_df['mean_cs_diff'] = (results_df['mean_cs'] -cs_agg_0)/np.absolute(cs_agg_0)
+results_df['var_cs_diff'] = (results_df['var_cs'] -cs_agg_0)/np.absolute(cs_agg_0)
+
+results_df.to_csv("ramsey_welfare_result/sq_p_result.csv", index=False)
+
+del results_df, r_step_agg_results,cs_step_agg_results,q_step_agg_results,ev_step_agg_results
+del r_step_agg_results_iqr,cs_step_agg_results_iqr,q_step_agg_results_iqr,ev_step_agg_results_iqr
+
+
+########################################
+######### Not Changing NDVI ##########
+########################################
+
+input_NDVI = NDVI
 
 steps = jnp.arange(-0.25, 0.3, 0.05, dtype=jnp.float32)
 
@@ -2665,52 +3407,31 @@ param0_low = jnp.array([3, 3, 3, 3, 3,
                     7.125, 7.125,7.125,7.125
                     ])
 
-def get_initial_param_for_step(step: jax.Array, param_high: jax.Array, param_med: jax.Array, param_low: jax.Array) -> jax.Array:
-    """
-    Determines the initial parameter value based on the step according to specified ranges:
-    - [-0.25, -0.15] -> param_high (inclusive)
-    - (-0.15, 0.15)  -> param_med (exclusive)
-    - [0.15, 0.25]   -> param_low (inclusive)
-
-    Args:
-        step: A JAX array (scalar) representing the current step value.
-        param_high: JAX array for the 'high' initial parameter guess.
-        param_med: JAX array for the 'medium' initial parameter guess.
-        param_low: JAX array for the 'low' initial parameter guess.
-
-    Returns:
-        A JAX array representing the selected initial parameter guess.
-    """
-    # Define the nominal boundary points as float32 JAX arrays
-    nominal_neg_15 = jnp.array(-0.15, dtype=jnp.float32)
-    nominal_pos_15 = jnp.array(0.15, dtype=jnp.float32)
-
-    # Define a small, effective tolerance for float32 comparisons.
-    # np.finfo(np.float32).eps (machine epsilon) is approx 1.19e-07.
-    # A small multiple of this is typically used to create a robust comparison window.
-    tolerance = jnp.finfo(jnp.float32).eps * jnp.array(4.0, dtype=jnp.float32) # Using 4.0 as a small multiplier
-
-    # --- Logic for the ranges with tolerance ---
-    # Range 1: [-0.25, -0.15] -> param_high (inclusive at -0.15)
-    # If step is less than or "effectively equal to" -0.15
-    if step <= (nominal_neg_15 + tolerance):
-        # We assume step >= -0.25 is handled by the `steps` array generation itself.
-        print(f"Step {step}: Using param_high as initial guess.")
-        return param_high
-    # Range 2: (-0.15, 0.15) -> param_med (exclusive on both ends)
-    # This means step is "effectively greater than" -0.15 AND "effectively less than" 0.15
-    # The `elif` condition implicitly handles `step > (nominal_neg_15 + tolerance)`
-    elif step < (nominal_pos_15 - tolerance):
-        print(f"Step {step}: Using param_med as initial guess.")
-        return param_med
-    # Range 3: [0.15, 0.25] -> param_low (inclusive at 0.15)
-    # This means step is "effectively greater than or equal to" 0.15
-    else: # This catches values >= (nominal_pos_15 - tolerance)
-        print(f"Step {step}: Using param_low as initial guess.")
-        return param_low
 
 # JIT compile the function
-get_initial_param_for_step_jitted = jax.jit(get_initial_param_for_step)
+def get_initial_param_for_step(step: jax.Array, param_high: jax.Array, param_med: jax.Array, param_low: jax.Array) -> jax.Array:
+    """
+    Determines the initial parameter value based on the sign of the step:
+    - step <= -0.25      -> param_high
+    - -0.25 < step < 0  -> param_med
+    - step >= 0         -> param_low
+
+    Args:
+        step: A NumPy array (scalar) representing the current step value.
+        param_high: NumPy array for the initial parameter guess when step is <= -0.25.
+        param_med: NumPy array for the initial parameter guess when step is between -0.25 and 0.
+        param_low: NumPy array for the initial parameter guess when step is non-negative.
+
+    Returns:
+        A NumPy array representing the selected initial parameter guess.
+    """
+    # Nested where to handle the three conditions
+    return np.where(step >= 0,
+                    param_low,
+                    np.where(step <= -0.25, param_high, param_med))
+
+
+
 
 for step in steps:
     try:
@@ -2720,24 +3441,26 @@ for step in steps:
         Z_step = Z_current.at[:, 2].add(step)  # Modify slice (columns 3)
         Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
         
-        precomputed_Z_samples = generate_mc_perturbed_Z_samples(Z_step)
+        #precomputed_Z_samples = generate_mc_perturbed_Z_samples(Z_step)
 
         # Define constraints
         constraint_conserve = NonlinearConstraint(
-            lambda x: get_mc_result_conserve_from_perturbed_Z(x, precomputed_Z_samples), 
+            lambda x: conservation_constraint_jitted(x, Z_step, input_NDVI), 
             0.95, 1.0, jac='2-point', hess=BFGS()
         )
         #constraint_revenue = NonlinearConstraint(
         #    lambda x: revenue_lower_bound_constraint_jitted(x, Z_step), 
         #    0.0, jnp.inf, jac='2-point', hess=BFGS()
         #)
-        
-        initial_param_for_step = get_initial_param_for_step(step, param0_high, param0_med, param0_low)
+    
+        initial_param_for_step = get_initial_param_for_step(step, 
+                                                            param0_high, 
+                                                            param0_med, param0_low)
         param0_high_np = np.array(initial_param_for_step, dtype=jnp.float32) # Ensure NumPy conversion
 
         # First optimization attempt
         solution1_nobd = cobyqa.minimize(
-            lambda x: objective0_jitted(x, precomputed_Z_samples), 
+            lambda x: objective0_jitted(x, Z_step, input_NDVI), 
             param0_high_np,
             bounds=bounds0, 
             constraints=(constraint_conserve
@@ -2752,10 +3475,10 @@ for step in steps:
         if not solution1_nobd.success:
             print(f"Step {step}: First attempt did not converge. Retrying with new initial guess.")
             solution1_nobd_2 = cobyqa.minimize(
-                lambda x: objective0_jitted(x, precomputed_Z_samples), 
+                lambda x: objective0_jitted(x, Z_step, input_NDVI), 
                 np.array(solution1_nobd.x, dtype=jnp.float32),  # Ensure NumPy conversion
                 bounds=bounds0, 
-                constraints=(constraint_conserve
+                constraints=(constraint_conserve, input_NDVI
                              #, constraint_revenue
                              ), 
                 options={'disp': False, 'feasibility_tol': 1e-6, 'radius_init': 1, 'radius_final': 0.01}
@@ -2766,7 +3489,7 @@ for step in steps:
             solution1_nobd_final = solution1_nobd
 
         # **Check for Constraint Violations**
-        conserve_value = get_mc_result_conserve_from_perturbed_Z(solution1_nobd_final.x, precomputed_Z_samples)
+        conserve_value = conservation_constraint_jitted(solution1_nobd_final.x, Z_step, input_NDVI)
         #revenue_value = revenue_lower_bound_constraint_jitted(solution1_nobd_final.x, Z_step)
 
         tolerance = 1e-6
@@ -2782,14 +3505,14 @@ for step in steps:
 
         # Process constraints
         #processed_Z = average_Z_jitted(Z_step)
-        q_sum_hh_step = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z_step)
+        q_sum_hh_step = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z_step, input_NDVI)
         r_step = from_q_to_r_jitted(q_sum_hh_step, p_l, q_l, fc_l)
         r_step_agg = nansum_ignore_nan_inf_jitted(r_step) / 12
-        cs_step = get_v_out_jitted(q_sum_hh_step, p_l, q_l, fc_l, Z_step)
+        cs_step = get_v_out_jitted(q_sum_hh_step, p_l, q_l, fc_l, Z_step,input_NDVI)
         cs_step_agg = nansum_ignore_nan_inf_jitted(cs_step) / 12
         q_hh_step = q_sum_hh_step/sim
         q_step_agg = nansum_ignore_nan_inf_jitted(q_hh_step) / 12
-        ev_step = get_ev_jitted(q_sum_hh_step, p_l, q_l, fc_l, Z_step)
+        ev_step = get_ev_jitted(q_sum_hh_step, cs_step)
         ev_step_agg = nansum_ignore_nan_inf_jitted(ev_step) / 12
 
         # Append results
@@ -2821,59 +3544,59 @@ if error_log:
 pl_step_agg_results = jnp.array(pl_step_agg_results)
 pl_step_agg_results  = pl_step_agg_results.T
 pl_step_agg_results_df = pd.DataFrame(pl_step_agg_results)
-pl_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/montecarlo_weather_avg_bound_loss05_mean_pl.csv", index=False)
+pl_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/sq_ndvi_avg_bound_loss05_mean_pl.csv", index=False)
 del pl_step_agg_results, pl_step_agg_results_df
 
 ql_step_agg_results = jnp.array(ql_step_agg_results)
 ql_step_agg_results  = ql_step_agg_results.T
 ql_step_agg_results_df = pd.DataFrame(ql_step_agg_results)
-ql_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/montecarlo_weather_avg_bound_loss05_mean_ql.csv", index=False)
+ql_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/sq_ndvi_avg_bound_loss05_mean_ql.csv", index=False)
 del ql_step_agg_results, ql_step_agg_results_df
 
 fcl_step_agg_results = jnp.array(fcl_step_agg_results)
 fcl_step_agg_results  = fcl_step_agg_results.T
 fcl_step_agg_results_df = pd.DataFrame(fcl_step_agg_results)
-fcl_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/montecarlo_weather_avg_bound_loss05_mean_fcl.csv", index=False)
+fcl_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/sq_ndvi_avg_bound_loss05_mean_fcl.csv", index=False)
 del fcl_step_agg_results, fcl_step_agg_results_df
 
 r_step_agg_results = jnp.array(r_step_agg_results)
 r_step_agg_results_df = pd.DataFrame(r_step_agg_results)
-r_step_agg_results_df.to_csv("ramsey_welfare_result/montecarlo_weather_avg_bound_loss05_mean_r.csv", index=False)
+r_step_agg_results_df.to_csv("ramsey_welfare_result/sq_ndvi_avg_bound_loss05_mean_r.csv", index=False)
 
 cs_step_agg_results = jnp.array(cs_step_agg_results)
 cs_step_agg_results_df = pd.DataFrame(cs_step_agg_results)
-cs_step_agg_results_df.to_csv("ramsey_welfare_result/montecarlo_weather_avg_bound_loss05_mean_cs.csv", index=False)
+cs_step_agg_results_df.to_csv("ramsey_welfare_result/sq_ndvi_avg_bound_loss05_mean_cs.csv", index=False)
 
 q_step_agg_results = jnp.array(q_step_agg_results)
 q_step_agg_results_df = pd.DataFrame(q_step_agg_results)
-q_step_agg_results_df.to_csv("ramsey_welfare_result/montecarlo_weather_avg_bound_loss05_mean_q.csv", index=False)
+q_step_agg_results_df.to_csv("ramsey_welfare_result/sq_ndvi_avg_bound_loss05_mean_q.csv", index=False)
 
 ev_step_agg_results = jnp.array(ev_step_agg_results)
 ev_step_agg_results_df = pd.DataFrame(ev_step_agg_results)
-ev_step_agg_results_df.to_csv("ramsey_welfare_result/montecarlo_weather_avg_bound_loss05_mean_ev.csv", index=False)
+ev_step_agg_results_df.to_csv("ramsey_welfare_result/sq_ndvi_avg_bound_loss05_mean_ev.csv", index=False)
 
 cs_step_results = jnp.array(cs_step_results)
 cs_step_results=cs_step_results.T
 cs_step_results_df = pd.DataFrame(cs_step_results)
-cs_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_avg_bound_loss05_mean_cs_steps.csv", index=False)
+cs_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/sq_ndvi_avg_bound_loss05_mean_cs_steps.csv", index=False)
 del cs_step_results, cs_step_results_df
 
 q_step_results = jnp.array(q_step_results)
 q_step_results=q_step_results.T
 q_step_results_df = pd.DataFrame(q_step_results)
-q_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_avg_bound_loss05_mean_q_steps.csv", index=False)
+q_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/sq_ndvi_avg_bound_loss05_mean_q_steps.csv", index=False)
 del q_step_results, q_step_results_df
 
 r_step_results = jnp.array(r_step_results)
 r_step_results=r_step_results.T
 r_step_results_df = pd.DataFrame(r_step_results)
-r_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_avg_bound_loss05_mean_r_steps.csv", index=False)
+r_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/sq_ndvi_avg_bound_loss05_mean_r_steps.csv", index=False)
 del r_step_results, r_step_results_df
 
 ev_step_results = jnp.array(ev_step_results)
 ev_step_results=ev_step_results.T
 ev_step_results_df = pd.DataFrame(ev_step_results)
-ev_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_avg_bound_loss05_mean_ev_steps.csv", index=False)
+ev_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/sq_ndvi_avg_bound_loss05_mean_ev_steps.csv", index=False)
 del ev_step_results, ev_step_results_df
 
 #######################################
@@ -2994,52 +3717,29 @@ param0_low = jnp.array([3, 3, 3, 3, 3,
                     ])
 
 
-def get_initial_param_for_s_step(s_step: jax.Array, 
-                                 param_high: jax.Array,
-                                 param_med: jax.Array, 
-                                 param_low: jax.Array, 
+def get_initial_param_for_s_step(s_step: jax.Array,
+                                 param_low: jax.Array,
+                                 param_med: jax.Array
                                  ) -> jax.Array:
     """
-    Determines the initial parameter value based on the s_step according to specified ranges:
-    - [0.75, 0.85] -> param_low (inclusive)
-    - (0.85, 1.15) -> param_med (exclusive)
-    - [1.15, 1.25] -> param_high (inclusive)
+    Determines the initial parameter value based on the s_step value:
+    - s_step <= 1 -> param_low
+    - s_step > 1  -> param_med
 
     Args:
         s_step: A JAX array (scalar) representing the current s_step value.
-        param_low: JAX array for the 'low' initial parameter guess.
-        param_med: JAX array for the 'medium' initial parameter guess.
-        param_high: JAX array for the 'high' initial parameter guess.
+        param_low: JAX array for the initial parameter guess when s_step <= 1.
+        param_med: JAX array for the initial parameter guess when s_step > 1.
 
     Returns:
         A JAX array representing the selected initial parameter guess.
     """
-    # Define the nominal boundary points as float32 JAX arrays
-    nominal_0_85 = jnp.array(0.85, dtype=jnp.float32)
-    nominal_1_15 = jnp.array(1.15, dtype=jnp.float32)
+    # Use jnp.where for efficient, JIT-compatible conditional logic.
+    # Condition: s_step <= 1
+    # If True: return param_low
+    # If False: return param_med
+    return jnp.where(s_step <= 1, param_low, param_med)
 
-    # Define a small, effective tolerance for float32 comparisons.
-    # Using a small multiple of machine epsilon to create a robust comparison window.
-    tolerance = jnp.finfo(jnp.float32).eps * jnp.array(4.0, dtype=jnp.float32)
-
-    # --- Logic for the ranges with tolerance ---
-    # Range 1: [0.75, 0.85] -> param_low (inclusive at 0.85)
-    # If s_step is less than or "effectively equal to" 0.85
-    if s_step <= (nominal_0_85 + tolerance):
-        # We assume s_step >= 0.75 is handled by the `s_steps` array generation itself.
-        print(f"s_Step {s_step}: Using param_low as initial guess.")
-        return param_low
-    # Range 2: (0.85, 1.15) -> param_med (exclusive on both ends)
-    # This means s_step is "effectively greater than" 0.85 AND "effectively less than" 1.15
-    # The `elif` condition implicitly handles `s_step > (nominal_0_85 + tolerance)`
-    elif s_step < (nominal_1_15 - tolerance):
-        print(f"s_Step {s_step}: Using param_med as initial guess.")
-        return param_med
-    # Range 3: [1.15, 1.25] -> param_high (inclusive at 1.15)
-    # This means s_step is "effectively greater than or equal to" 1.15
-    else: # This catches values >= (nominal_1_15 - tolerance)
-        print(f"s_Step {s_step}: Using param_high as initial guess.")
-        return param_high
 
 for step in s_steps:
     try:
@@ -3049,11 +3749,11 @@ for step in s_steps:
         Z_step = Z_step.at[:,2 ].set(scale_sd_non_parametric_jitted(Z_step[:, 2], step))
         Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
         
-        precomputed_Z_samples = generate_mc_perturbed_Z_samples(Z_step)
+        #precomputed_Z_samples = generate_mc_perturbed_Z_samples(Z_step)
 
         # Define constraints
         constraint_conserve = NonlinearConstraint(
-            lambda x: get_mc_result_conserve_from_perturbed_Z(x, precomputed_Z_samples), 
+            lambda x: conservation_constraint_jitted(x, Z_step, input_NDVI), 
             0.95, 1.0, jac='2-point', hess=BFGS()
         )
         #constraint_revenue = NonlinearConstraint(
@@ -3063,12 +3763,14 @@ for step in s_steps:
         
         ### Determine the initial value based on the current step
         # Call the function to get the initial parameter for this step
-        initial_param_for_step = get_initial_param_for_s_step(step, param0_high, param0_med, param0_low)
+        initial_param_for_step = get_initial_param_for_s_step(step, 
+                                                              #param0_high, 
+                                                              param0_low, param0_med)
         param0_high_np = np.array(initial_param_for_step, dtype=jnp.float32) # Ensure NumPy conversion
 
         # First optimization attempt
         solution1_nobd = cobyqa.minimize(
-            lambda x: objective0(x, precomputed_Z_samples), 
+            lambda x: objective0(x, Z_step, input_NDVI), 
             param0_high_np,
             bounds=bounds0, 
             constraints=(constraint_conserve
@@ -3083,7 +3785,7 @@ for step in s_steps:
         if not solution1_nobd.success:
             print(f"Step {step}: First attempt did not converge. Retrying with new initial guess.")
             solution1_nobd_2 = cobyqa.minimize(
-                lambda x: objective0(x, precomputed_Z_samples), 
+                lambda x: objective0(x, Z_step, input_NDVI), 
                 np.array(solution1_nobd.x, dtype=jnp.float32),  # Ensure NumPy conversion
                 bounds=bounds0, 
                 constraints=(constraint_conserve
@@ -3097,7 +3799,7 @@ for step in s_steps:
             solution1_nobd_final = solution1_nobd
 
         # **Check for Constraint Violations**
-        conserve_value = get_mc_result_conserve_from_perturbed_Z(solution1_nobd_final.x, precomputed_Z_samples)
+        conserve_value = conservation_constraint_jitted(solution1_nobd_final.x, Z_step, input_NDVI)
         #revenue_value = revenue_lower_bound_constraint_jitted(solution1_nobd_final.x, Z_step)
 
         tolerance = 1e-6
@@ -3113,14 +3815,14 @@ for step in s_steps:
 
         # Process constraints
         #processed_Z = average_Z_jitted(Z_step)
-        q_sum_hh_step = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z_step)
+        q_sum_hh_step = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z_step, input_NDVI)
         r_step = from_q_to_r_jitted(q_sum_hh_step, p_l, q_l, fc_l)
         r_step_agg = nansum_ignore_nan_inf_jitted(r_step) / 12
-        cs_step = get_v_out_jitted(q_sum_hh_step, p_l, q_l, fc_l, Z_step)
+        cs_step = get_v_out_jitted(q_sum_hh_step, p_l, q_l, fc_l, Z_step, input_NDVI)
         cs_step_agg = nansum_ignore_nan_inf_jitted(cs_step) / 12
         q_hh_step = q_sum_hh_step/sim
         q_step_agg = nansum_ignore_nan_inf_jitted(q_hh_step) / 12
-        ev_step = get_ev_jitted(q_sum_hh_step, p_l, q_l, fc_l, Z_step)
+        ev_step = get_ev_jitted(q_sum_hh_step, cs_step)
         ev_step_agg = nansum_ignore_nan_inf_jitted(ev_step) / 12
 
         # Append results
@@ -3154,59 +3856,59 @@ if error_log_var:
 pl_step_agg_results_iqr = jnp.array(pl_step_agg_results_iqr)
 pl_step_agg_results_iqr  = pl_step_agg_results_iqr.T
 pl_step_agg_results_iqr_df = pd.DataFrame(pl_step_agg_results_iqr)
-pl_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/montecarlo_weather_avg_bound_loss05_var_pl.csv", index=False)
+pl_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/sq_ndvi_avg_bound_loss05_var_pl.csv", index=False)
 del pl_step_agg_results_iqr, pl_step_agg_results_iqr_df
 
 ql_step_agg_results_iqr = jnp.array(ql_step_agg_results_iqr)
 ql_step_agg_results_iqr  = ql_step_agg_results_iqr.T
 ql_step_agg_results_iqr_df = pd.DataFrame(ql_step_agg_results_iqr)
-ql_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/montecarlo_weather_avg_bound_loss05_var_ql.csv", index=False)
+ql_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/sq_ndvi_avg_bound_loss05_var_ql.csv", index=False)
 del ql_step_agg_results_iqr, ql_step_agg_results_iqr_df
 
 fcl_step_agg_results_iqr = jnp.array(fcl_step_agg_results_iqr)
 fcl_step_agg_results_iqr  = fcl_step_agg_results_iqr.T
 fcl_step_agg_results_iqr_df = pd.DataFrame(fcl_step_agg_results_iqr)
-fcl_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/montecarlo_weather_avg_bound_loss05_var_fcl.csv", index=False)
+fcl_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/sq_ndvi_avg_bound_loss05_var_fcl.csv", index=False)
 del fcl_step_agg_results_iqr, fcl_step_agg_results_iqr_df
 
 r_step_agg_results_iqr = jnp.array(r_step_agg_results_iqr)
 r_step_agg_results_iqr_df = pd.DataFrame(r_step_agg_results_iqr)
-r_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/montecarlo_weather_avg_bound_loss05_var_r.csv", index=False)
+r_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/sq_ndvi_avg_bound_loss05_var_r.csv", index=False)
 
 cs_step_agg_results_iqr = jnp.array(cs_step_agg_results_iqr)
 cs_step_agg_results_iqr_df = pd.DataFrame(cs_step_agg_results_iqr)
-cs_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/montecarlo_weather_avg_bound_loss05_var_cs.csv", index=False)
+cs_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/sq_ndvi_avg_bound_loss05_var_cs.csv", index=False)
 
 q_step_agg_results_iqr = jnp.array(q_step_agg_results_iqr)
 q_step_agg_results_iqr_df = pd.DataFrame(q_step_agg_results_iqr)
-q_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/montecarlo_weather_avg_bound_loss05_var_q.csv", index=False)
+q_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/sq_ndvi_avg_bound_loss05_var_q.csv", index=False)
 
 ev_step_agg_results_iqr = jnp.array(ev_step_agg_results_iqr)
 ev_step_agg_results_iqr_df = pd.DataFrame(ev_step_agg_results_iqr)
-ev_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/montecarlo_weather_avg_bound_loss05_var_ev.csv", index=False)
+ev_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/sq_ndvi_avg_bound_loss05_var_ev.csv", index=False)
 
 cs_step_results_iqr = jnp.array(cs_step_results_iqr)
 cs_step_results_iqr=cs_step_results_iqr.T
 cs_step_results_iqr_df = pd.DataFrame(cs_step_results_iqr)
-cs_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_avg_bound_loss05_var_cs_steps.csv", index=False)
+cs_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/sq_ndvi_avg_bound_loss05_var_cs_steps.csv", index=False)
 del cs_step_results_iqr, cs_step_results_iqr_df
 
 q_step_results_iqr = jnp.array(q_step_results_iqr)
 q_step_results_iqr=q_step_results_iqr.T
 q_step_results_iqr_df = pd.DataFrame(q_step_results_iqr)
-q_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_avg_bound_loss05_var_q_steps.csv", index=False)
+q_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/sq_ndvi_avg_bound_loss05_var_q_steps.csv", index=False)
 del q_step_results_iqr, q_step_results_iqr_df
 
 r_step_results_iqr = jnp.array(r_step_results_iqr)
 r_step_results_iqr=r_step_results_iqr.T
 r_step_results_iqr_df = pd.DataFrame(r_step_results_iqr)
-r_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_avg_bound_loss05_var_r_steps.csv", index=False)
+r_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/sq_ndvi_avg_bound_loss05_var_r_steps.csv", index=False)
 del r_step_results_iqr, r_step_results_iqr_df
 
 ev_step_results_iqr = jnp.array(ev_step_results_iqr)
 ev_step_results_iqr=ev_step_results_iqr.T
 ev_step_results_iqr_df = pd.DataFrame(ev_step_results_iqr)
-ev_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_avg_bound_loss05_var_ev_steps.csv", index=False)
+ev_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/sq_ndvi_avg_bound_loss05_var_ev_steps.csv", index=False)
 del ev_step_results_iqr, ev_step_results_iqr_df
 
 # Convert results to DataFrame
@@ -3230,10 +3932,1019 @@ results_df['var_q_diff'] = (results_df['var_q'] -q_agg_0)/q_agg_0
 results_df['mean_cs_diff'] = (results_df['mean_cs'] -cs_agg_0)/np.absolute(cs_agg_0)
 results_df['var_cs_diff'] = (results_df['var_cs'] -cs_agg_0)/np.absolute(cs_agg_0)
 
-results_df.to_csv("ramsey_welfare_result/montecarlo_weather_avg_bound_loss05_result.csv", index=False)
+results_df.to_csv("ramsey_welfare_result/sq_ndvi_avg_bound_loss05_result.csv", index=False)
 
 del results_df, r_step_agg_results,cs_step_agg_results,q_step_agg_results,ev_step_agg_results
 del r_step_agg_results_iqr,cs_step_agg_results_iqr,q_step_agg_results_iqr,ev_step_agg_results_iqr
+
+
+#########################################
+###### Building Counterfactual NDVI #####
+#########################################
+
+def run_simulation_for_factor(reduction_factor: float):
+    """
+    Runs the entire optimization and analysis process for a single reduction_factor.
+    """
+    print(f"\n{'='*60}\nRunning simulation for reduction_factor: {reduction_factor}\n{'='*60}")
+
+    # Create directories for results if they don't exist
+    # This is a good practice to avoid errors
+    os.makedirs("ramsey_price_result/price_detail_results", exist_ok=True)
+    os.makedirs("ramsey_welfare_result/cs_detail_results", exist_ok=True)
+
+    # ==========================================================================
+    # Part A: Initial NDVI Modification based on the reduction factor
+    # ==========================================================================
+    low_income_mask = (I >= 0) & (I <= 6000)
+    selected_ndvi = NDVI[low_income_mask]
+    values_to_set = jnp.where(selected_ndvi >= 0, selected_ndvi * reduction_factor, selected_ndvi)
+    updated_NDVI = NDVI.at[low_income_mask].set(values_to_set)
+    input_NDVI = updated_NDVI
+    
+    # Use a clear, dynamic name for file outputs
+    # Example: 'reduction_0.50' for a factor of 0.5
+    file_prefix = f"reduction_{reduction_factor:.2f}"
+
+    # ==========================================================================
+    # Part B: Analysis on the MEAN (iterating through 'steps')
+    # ==========================================================================
+    print(f"--- Starting MEAN analysis for factor {reduction_factor} ---")
+    steps = jnp.arange(-0.25, 0.3, 0.05, dtype=jnp.float32)
+    # (Initialize result lists, param arrays, etc. for this part)
+    pl_step_agg_results, ql_step_agg_results, fcl_step_agg_results = [], [], []
+    r_step_agg_results, cs_step_agg_results, q_step_agg_results, ev_step_agg_results = [], [], [], []
+    cs_step_results, q_step_results, r_step_results, ev_step_results = [], [], [], []
+    error_log = []
+
+    param0_high = jnp.array([3, 8, 8, 8, 8, 2, 4, 5, 9, 8.5, 7.125, 7.125, 7.125, 7.125])
+    param0_med = jnp.array([3, 5, 5, 5, 5, 2, 4, 5, 9, 8.5, 7.125, 7.125, 7.125, 7.125])
+    param0_low = jnp.array([3, 3, 3, 3, 3, 2, 4, 5, 9, 8.5, 7.125, 7.125, 7.125, 7.125])
+    
+    def get_initial_param_for_step(step: jax.Array, param_high: jax.Array, param_med: jax.Array, param_low: jax.Array) -> jax.Array:
+        """
+        Determines the initial parameter value based on the sign of the step:
+        - step <= -0.25      -> param_high
+        - -0.25 < step < 0  -> param_med
+        - step >= 0         -> param_low
+
+        Args:
+            step: A NumPy array (scalar) representing the current step value.
+            param_high: NumPy array for the initial parameter guess when step is <= -0.25.
+            param_med: NumPy array for the initial parameter guess when step is between -0.25 and 0.
+            param_low: NumPy array for the initial parameter guess when step is non-negative.
+
+        Returns:
+            A NumPy array representing the selected initial parameter guess.
+        """
+        # Nested where to handle the three conditions
+        return np.where(step >= 0,
+                        param_low,
+                        np.where(step <= -0.25, param_high, param_med))
+
+    # --- Your original loop for 'steps' ---
+    for step in steps:
+        try:
+            # Update Z_step with the current step
+            Z_step = Z_current.copy()  # Preserve original structure
+            #Z_step = Z_history.copy()  # Preserve original structure
+            Z_step = Z_current.at[:, 2].add(step)  # Modify slice (columns 3)
+            Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
+            
+            #precomputed_Z_samples = generate_mc_perturbed_Z_samples(Z_step)
+
+            # Define constraints
+            constraint_conserve = NonlinearConstraint(
+                lambda x: conservation_constraint_jitted(x, Z_step, input_NDVI), 
+                0.95, 1.0, jac='2-point', hess=BFGS()
+            )
+            #constraint_revenue = NonlinearConstraint(
+            #    lambda x: revenue_lower_bound_constraint_jitted(x, Z_step), 
+            #    0.0, jnp.inf, jac='2-point', hess=BFGS()
+            #)
+        
+            initial_param_for_step = get_initial_param_for_step(step, 
+                                                            param0_high, 
+                                                                param0_med, param0_low)
+            param0_high_np = np.array(initial_param_for_step, dtype=jnp.float32) # Ensure NumPy conversion
+
+            # First optimization attempt
+            solution1_nobd = cobyqa.minimize(
+                lambda x: objective0_jitted(x, Z_step, input_NDVI), 
+                param0_high_np,
+                bounds=bounds0, 
+                constraints=(constraint_conserve
+                             #, constraint_revenue
+                             ), 
+                options={'disp': False, 'feasibility_tol': 1e-6, 'radius_init': 1, 'radius_final': 0.01}
+            )
+
+            solution1_nobd.x = np.array(solution1_nobd.x)
+
+            # Retry if optimization did not converge
+            if not solution1_nobd.success:
+                print(f"Step {step}: First attempt did not converge. Retrying with new initial guess.")
+                solution1_nobd_2 = cobyqa.minimize(
+                    lambda x: objective0_jitted(x, Z_step, input_NDVI), 
+                    np.array(solution1_nobd.x, dtype=jnp.float32),  # Ensure NumPy conversion
+                    bounds=bounds0, 
+                    constraints=(constraint_conserve
+                                 #, constraint_revenue
+                                 ), 
+                    options={'disp': False, 'feasibility_tol': 1e-6, 'radius_init': 1, 'radius_final': 0.01}
+                )
+                solution1_nobd_final = solution1_nobd_2
+            else:
+                print(f"Step {step}: Optimization converged successfully.")
+                solution1_nobd_final = solution1_nobd
+
+            # **Check for Constraint Violations**
+            conserve_value = conservation_constraint_jitted(solution1_nobd_final.x, Z_step, input_NDVI)
+            #revenue_value = revenue_lower_bound_constraint_jitted(solution1_nobd_final.x, Z_step)
+
+            tolerance = 1e-6
+
+            if conserve_value < (0.95 - tolerance) or conserve_value > (1.0 + tolerance):
+               raise ValueError(f"Step {step}: Conservation constraint violated! Value: {conserve_value}")
+
+            #if revenue_value < -tolerance:
+            #   raise ValueError(f"Step {step}: Revenue constraint violated! Value: {revenue_value}")
+
+            # Compute optimal price and quantities
+            p_l, q_l, fc_l = param_to_pq0_jitted(solution1_nobd_final.x)
+
+            # Process constraints
+            #processed_Z = average_Z_jitted(Z_step)
+            q_sum_hh_step = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z_step, input_NDVI)
+            r_step = from_q_to_r_jitted(q_sum_hh_step, p_l, q_l, fc_l)
+            r_step_agg = nansum_ignore_nan_inf_jitted(r_step) / 12
+            cs_step = get_v_out_jitted(q_sum_hh_step, p_l, q_l, fc_l, Z_step,input_NDVI)
+            cs_step_agg = nansum_ignore_nan_inf_jitted(cs_step) / 12
+            q_hh_step = q_sum_hh_step/sim
+            q_step_agg = nansum_ignore_nan_inf_jitted(q_hh_step) / 12
+            ev_step = get_ev_jitted(q_sum_hh_step, cs_step)
+            ev_step_agg = nansum_ignore_nan_inf_jitted(ev_step) / 12
+
+            # Append results
+            pl_step_agg_results.append(p_l)
+            ql_step_agg_results.append(q_l)
+            fcl_step_agg_results.append(fc_l)
+            r_step_agg_results.append(r_step_agg)
+            cs_step_agg_results.append(cs_step_agg)
+            q_step_agg_results.append(q_step_agg)
+            ev_step_agg_results.append(ev_step_agg)
+            cs_step_results.append(cs_step)
+            q_step_results.append(q_hh_step)
+            r_step_results.append(r_step)
+            ev_step_results.append(ev_step)
+
+
+        except ValueError as e:
+            error_log.append(str(e))  # Store error message
+            print(f"Error at step {step}: {e}")  # Optional: Print errors immediately
+
+    # **Print all errors after the loop**
+    if error_log:
+        print("\nErrors encountered during optimization:")
+        for err in error_log:
+            print(err)
+
+
+    # Convert results to arrays for further processing
+    pl_step_agg_results = jnp.array(pl_step_agg_results)
+    pl_step_agg_results  = pl_step_agg_results.T
+    pl_step_agg_results_df = pd.DataFrame(pl_step_agg_results)
+    pl_step_agg_results_df.to_csv(f"ramsey_price_result/price_detail_results/{file_prefix}_low_avg_bound_loss05_mean_pl.csv", index=False)
+    del pl_step_agg_results, pl_step_agg_results_df
+
+    ql_step_agg_results = jnp.array(ql_step_agg_results)
+    ql_step_agg_results  = ql_step_agg_results.T
+    ql_step_agg_results_df = pd.DataFrame(ql_step_agg_results)
+    ql_step_agg_results_df.to_csv(f"ramsey_price_result/price_detail_results/{file_prefix}_low_avg_bound_loss05_mean_ql.csv", index=False)
+    del ql_step_agg_results, ql_step_agg_results_df
+
+    fcl_step_agg_results = jnp.array(fcl_step_agg_results)
+    fcl_step_agg_results  = fcl_step_agg_results.T
+    fcl_step_agg_results_df = pd.DataFrame(fcl_step_agg_results)
+    fcl_step_agg_results_df.to_csv(f"ramsey_price_result/price_detail_results/{file_prefix}_low_avg_bound_loss05_mean_fcl.csv", index=False)
+    del fcl_step_agg_results, fcl_step_agg_results_df
+
+    r_step_agg_results = jnp.array(r_step_agg_results)
+    r_step_agg_results_df = pd.DataFrame(r_step_agg_results)
+    r_step_agg_results_df.to_csv(f"ramsey_welfare_result/{file_prefix}_low_avg_bound_loss05_mean_r.csv", index=False)
+
+    cs_step_agg_results = jnp.array(cs_step_agg_results)
+    cs_step_agg_results_df = pd.DataFrame(cs_step_agg_results)
+    cs_step_agg_results_df.to_csv(f"ramsey_welfare_result/{file_prefix}_low_avg_bound_loss05_mean_cs.csv", index=False)
+
+    q_step_agg_results = jnp.array(q_step_agg_results)
+    q_step_agg_results_df = pd.DataFrame(q_step_agg_results)
+    q_step_agg_results_df.to_csv(f"ramsey_welfare_result/{file_prefix}_low_avg_bound_loss05_mean_q.csv", index=False)
+
+    ev_step_agg_results = jnp.array(ev_step_agg_results)
+    ev_step_agg_results_df = pd.DataFrame(ev_step_agg_results)
+    ev_step_agg_results_df.to_csv(f"ramsey_welfare_result/{file_prefix}_low_avg_bound_loss05_mean_ev.csv", index=False)
+
+    cs_step_results = jnp.array(cs_step_results)
+    cs_step_results=cs_step_results.T
+    cs_step_results_df = pd.DataFrame(cs_step_results)
+    cs_step_results_df.to_csv(f"ramsey_welfare_result/cs_detail_results/{file_prefix}_low_avg_bound_loss05_mean_cs_steps.csv", index=False)
+    del cs_step_results, cs_step_results_df
+
+    q_step_results = jnp.array(q_step_results)
+    q_step_results=q_step_results.T
+    q_step_results_df = pd.DataFrame(q_step_results)
+    q_step_results_df.to_csv(f"ramsey_welfare_result/cs_detail_results/{file_prefix}_low_avg_bound_loss05_mean_q_steps.csv", index=False)
+    del q_step_results, q_step_results_df
+
+    r_step_results = jnp.array(r_step_results)
+    r_step_results=r_step_results.T
+    r_step_results_df = pd.DataFrame(r_step_results)
+    r_step_results_df.to_csv(f"ramsey_welfare_result/cs_detail_results/{file_prefix}_low_avg_bound_loss05_mean_r_steps.csv", index=False)
+    del r_step_results, r_step_results_df
+
+    ev_step_results = jnp.array(ev_step_results)
+    ev_step_results=ev_step_results.T
+    ev_step_results_df = pd.DataFrame(ev_step_results)
+    ev_step_results_df.to_csv(f"ramsey_welfare_result/cs_detail_results/{file_prefix}_low_avg_bound_loss05_mean_ev_steps.csv", index=False)
+    del ev_step_results, ev_step_results_df
+
+    print(f"--- MEAN analysis finished for factor {reduction_factor} ---")
+
+
+    # ==========================================================================
+    # Part C: Analysis on the VARIANCE (iterating through 's_steps')
+    # ==========================================================================
+    print(f"--- Starting VARIANCE analysis for factor {reduction_factor} ---")
+    s_steps = jnp.arange(0.75, 1.25 + 0.05, 0.05, dtype=jnp.float32)
+    # (Initialize result lists, param arrays, etc. for this part)
+    pl_step_agg_results_iqr, ql_step_agg_results_iqr, fcl_step_agg_results_iqr = [], [], []
+    r_step_agg_results_iqr, cs_step_agg_results_iqr, q_step_agg_results_iqr, ev_step_agg_results_iqr = [], [], [], []
+    cs_step_results_iqr, q_step_results_iqr, r_step_results_iqr, ev_step_results_iqr = [], [], [], []
+    error_log_var = []
+
+    param0_med_var = jnp.array([3, 5, 5, 5, 5, 2, 4, 5, 9, 8.5, 7.125, 7.125, 7.125, 7.125])
+    param0_low_var = jnp.array([3, 3, 3, 3, 3, 2, 4, 5, 9, 8.5, 7.125, 7.125, 7.125, 7.125])
+    
+    def get_initial_param_for_s_step(s_step: jax.Array,
+                                     param_low: jax.Array,
+                                     param_med: jax.Array
+                                     ) -> jax.Array:
+        """
+        Determines the initial parameter value based on the s_step value:
+        - s_step <= 1 -> param_low
+        - s_step > 1  -> param_med
+
+        Args:
+            s_step: A JAX array (scalar) representing the current s_step value.
+            param_low: JAX array for the initial parameter guess when s_step <= 1.
+            param_med: JAX array for the initial parameter guess when s_step > 1.
+
+        Returns:
+            A JAX array representing the selected initial parameter guess.
+        """
+        # Use jnp.where for efficient, JIT-compatible conditional logic.
+        # Condition: s_step <= 1
+        # If True: return param_low
+        # If False: return param_med
+        return jnp.where(s_step <= 1, param_low, param_med)
+
+    # --- Your original loop for 's_steps' ---
+    for step in s_steps:
+        try:
+            # Update Z_step with the current step
+            #Z_step = Z_history.copy()  # Preserve original structure
+            Z_step = Z_current.copy()  # Preserve original structure
+            Z_step = Z_step.at[:,2 ].set(scale_sd_non_parametric_jitted(Z_step[:, 2], step))
+            Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
+            
+            #precomputed_Z_samples = generate_mc_perturbed_Z_samples(Z_step)
+
+            # Define constraints
+            constraint_conserve = NonlinearConstraint(
+                lambda x: conservation_constraint_jitted(x, Z_step, input_NDVI), 
+                0.95, 1.0, jac='2-point', hess=BFGS()
+            )
+            #constraint_revenue = NonlinearConstraint(
+            #    lambda x: revenue_lower_bound_constraint_jitted(x, Z_step), 
+            #    0.0, jnp.inf, jac='2-point', hess=BFGS()
+            #)
+            
+            ### Determine the initial value based on the current step
+            # Call the function to get the initial parameter for this step
+            initial_param_for_step = get_initial_param_for_s_step(step, 
+                                                                  #param0_high, 
+                                                                  param0_low_var, param0_med_var)
+            param0_high_np = np.array(initial_param_for_step, dtype=jnp.float32) # Ensure NumPy conversion
+
+            # First optimization attempt
+            solution1_nobd = cobyqa.minimize(
+                lambda x: objective0(x, Z_step, input_NDVI), 
+                param0_high_np,
+                bounds=bounds0, 
+                constraints=(constraint_conserve
+                             #, constraint_revenue
+                             ), 
+                options={'disp': False, 'feasibility_tol': 1e-6, 'radius_init': 1, 'radius_final': 0.01}
+            )
+
+            solution1_nobd.x = np.array(solution1_nobd.x)
+
+            # Retry if optimization did not converge
+            if not solution1_nobd.success:
+                print(f"Step {step}: First attempt did not converge. Retrying with new initial guess.")
+                solution1_nobd_2 = cobyqa.minimize(
+                    lambda x: objective0(x, Z_step, input_NDVI), 
+                    np.array(solution1_nobd.x, dtype=jnp.float32),  # Ensure NumPy conversion
+                    bounds=bounds0, 
+                    constraints=(constraint_conserve
+                                 #, constraint_revenue
+                                 ), 
+                    options={'disp': False, 'feasibility_tol': 1e-6, 'radius_init': 1, 'radius_final': 0.01}
+                )
+                solution1_nobd_final = solution1_nobd_2
+            else:
+                print(f"Step {step}: Optimization converged successfully.")
+                solution1_nobd_final = solution1_nobd
+
+            # **Check for Constraint Violations**
+            conserve_value = conservation_constraint_jitted(solution1_nobd_final.x, Z_step, input_NDVI)
+            #revenue_value = revenue_lower_bound_constraint_jitted(solution1_nobd_final.x, Z_step)
+
+            tolerance = 1e-6
+
+            if conserve_value < (0.95 - tolerance) or conserve_value > (1.0 + tolerance):
+               raise ValueError(f"Step {step}: Conservation constraint violated! Value: {conserve_value}")
+
+            #if revenue_value < -tolerance:
+            #   raise ValueError(f"Step {step}: Revenue constraint violated! Value: {revenue_value}")
+
+            # Compute optimal price and quantities
+            p_l, q_l, fc_l = param_to_pq0_jitted(solution1_nobd_final.x)
+
+            # Process constraints
+            #processed_Z = average_Z_jitted(Z_step)
+            q_sum_hh_step = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z_step, input_NDVI)
+            r_step = from_q_to_r_jitted(q_sum_hh_step, p_l, q_l, fc_l)
+            r_step_agg = nansum_ignore_nan_inf_jitted(r_step) / 12
+            cs_step = get_v_out_jitted(q_sum_hh_step, p_l, q_l, fc_l, Z_step, input_NDVI)
+            cs_step_agg = nansum_ignore_nan_inf_jitted(cs_step) / 12
+            q_hh_step = q_sum_hh_step/sim
+            q_step_agg = nansum_ignore_nan_inf_jitted(q_hh_step) / 12
+            ev_step = get_ev_jitted(q_sum_hh_step, cs_step)
+            ev_step_agg = nansum_ignore_nan_inf_jitted(ev_step) / 12
+
+            # Append results
+            pl_step_agg_results_iqr.append(p_l)
+            ql_step_agg_results_iqr.append(q_l)
+            fcl_step_agg_results_iqr.append(fc_l)
+            r_step_agg_results_iqr.append(r_step_agg)
+            cs_step_agg_results_iqr.append(cs_step_agg)
+            q_step_agg_results_iqr.append(q_step_agg)
+            ev_step_agg_results_iqr.append(ev_step_agg)
+            cs_step_results_iqr.append(cs_step)
+            q_step_results_iqr.append(q_hh_step)
+            r_step_results_iqr.append(r_step)
+            ev_step_results_iqr.append(ev_step)
+
+            # Clean up memory
+            del q_sum_hh_step, r_step, cs_step, q_hh_step, ev_step
+            gc.collect()
+
+        except ValueError as e:
+            error_log_var.append(str(e))  # Store error message
+            print(f"Error at step {step}: {e}")  # Optional: Print errors immediately
+
+    # **Print all errors after the loop**
+    if error_log_var:
+        print("\nErrors encountered during optimization:")
+        for err in error_log_var:
+            print(err)
+            
+    # Convert results to arrays for further processing
+    pl_step_agg_results_iqr = jnp.array(pl_step_agg_results_iqr)
+    pl_step_agg_results_iqr  = pl_step_agg_results_iqr.T
+    pl_step_agg_results_iqr_df = pd.DataFrame(pl_step_agg_results_iqr)
+    pl_step_agg_results_iqr_df.to_csv(f"ramsey_price_result/price_detail_results/{file_prefix}_low_avg_bound_loss05_var_pl.csv", index=False)
+    del pl_step_agg_results_iqr, pl_step_agg_results_iqr_df
+
+    ql_step_agg_results_iqr = jnp.array(ql_step_agg_results_iqr)
+    ql_step_agg_results_iqr  = ql_step_agg_results_iqr.T
+    ql_step_agg_results_iqr_df = pd.DataFrame(ql_step_agg_results_iqr)
+    ql_step_agg_results_iqr_df.to_csv(f"ramsey_price_result/price_detail_results/{file_prefix}_low_avg_bound_loss05_var_ql.csv", index=False)
+    del ql_step_agg_results_iqr, ql_step_agg_results_iqr_df
+
+    fcl_step_agg_results_iqr = jnp.array(fcl_step_agg_results_iqr)
+    fcl_step_agg_results_iqr  = fcl_step_agg_results_iqr.T
+    fcl_step_agg_results_iqr_df = pd.DataFrame(fcl_step_agg_results_iqr)
+    fcl_step_agg_results_iqr_df.to_csv(f"ramsey_price_result/price_detail_results/{file_prefix}_low_avg_bound_loss05_var_fcl.csv", index=False)
+    del fcl_step_agg_results_iqr, fcl_step_agg_results_iqr_df
+
+    r_step_agg_results_iqr = jnp.array(r_step_agg_results_iqr)
+    r_step_agg_results_iqr_df = pd.DataFrame(r_step_agg_results_iqr)
+    r_step_agg_results_iqr_df.to_csv(f"ramsey_welfare_result/{file_prefix}_low_avg_bound_loss05_var_r.csv", index=False)
+
+    cs_step_agg_results_iqr = jnp.array(cs_step_agg_results_iqr)
+    cs_step_agg_results_iqr_df = pd.DataFrame(cs_step_agg_results_iqr)
+    cs_step_agg_results_iqr_df.to_csv(f"ramsey_welfare_result/{file_prefix}_low_avg_bound_loss05_var_cs.csv", index=False)
+
+    q_step_agg_results_iqr = jnp.array(q_step_agg_results_iqr)
+    q_step_agg_results_iqr_df = pd.DataFrame(q_step_agg_results_iqr)
+    q_step_agg_results_iqr_df.to_csv(f"ramsey_welfare_result/{file_prefix}_low_avg_bound_loss05_var_q.csv", index=False)
+
+    ev_step_agg_results_iqr = jnp.array(ev_step_agg_results_iqr)
+    ev_step_agg_results_iqr_df = pd.DataFrame(ev_step_agg_results_iqr)
+    ev_step_agg_results_iqr_df.to_csv(f"ramsey_welfare_result/{file_prefix}_low_avg_bound_loss05_var_ev.csv", index=False)
+
+    cs_step_results_iqr = jnp.array(cs_step_results_iqr)
+    cs_step_results_iqr=cs_step_results_iqr.T
+    cs_step_results_iqr_df = pd.DataFrame(cs_step_results_iqr)
+    cs_step_results_iqr_df.to_csv(f"ramsey_welfare_result/cs_detail_results/{file_prefix}_low_avg_bound_loss05_var_cs_steps.csv", index=False)
+    del cs_step_results_iqr, cs_step_results_iqr_df
+
+    q_step_results_iqr = jnp.array(q_step_results_iqr)
+    q_step_results_iqr=q_step_results_iqr.T
+    q_step_results_iqr_df = pd.DataFrame(q_step_results_iqr)
+    q_step_results_iqr_df.to_csv(f"ramsey_welfare_result/cs_detail_results/{file_prefix}_low_avg_bound_loss05_var_q_steps.csv", index=False)
+    del q_step_results_iqr, q_step_results_iqr_df
+
+    r_step_results_iqr = jnp.array(r_step_results_iqr)
+    r_step_results_iqr=r_step_results_iqr.T
+    r_step_results_iqr_df = pd.DataFrame(r_step_results_iqr)
+    r_step_results_iqr_df.to_csv(f"ramsey_welfare_result/cs_detail_results/{file_prefix}_low_avg_bound_loss05_var_r_steps.csv", index=False)
+    del r_step_results_iqr, r_step_results_iqr_df
+
+    ev_step_results_iqr = jnp.array(ev_step_results_iqr)
+    ev_step_results_iqr=ev_step_results_iqr.T
+    ev_step_results_iqr_df = pd.DataFrame(ev_step_results_iqr)
+    ev_step_results_iqr_df.to_csv(f"ramsey_welfare_result/cs_detail_results/{file_prefix}_low_avg_bound_loss05_var_ev_steps.csv", index=False)
+    del ev_step_results_iqr, ev_step_results_iqr_df
+
+    print(f"--- VARIANCE analysis finished for factor {reduction_factor} ---")
+
+
+    # ==========================================================================
+    # Part D: Final Aggregated Results
+    # ==========================================================================
+
+    # Convert results to DataFrame
+    results_df = pd.DataFrame({
+        "steps": steps,
+        "s_steps": s_steps,
+        "mean_r": r_step_agg_results,
+        "mean_cs": cs_step_agg_results,
+        "mean_q": q_step_agg_results,
+        "mean_ev": ev_step_agg_results,
+        "var_r": r_step_agg_results_iqr,
+        "var_cs": cs_step_agg_results_iqr,
+        "var_q": q_step_agg_results_iqr,
+        "var_ev": ev_step_agg_results_iqr,
+    })
+
+    results_df['mean_r_diff'] = (results_df['mean_r'] -r_agg_0)/r_agg_0
+    results_df['var_r_diff'] = (results_df['var_r'] -r_agg_0)/r_agg_0
+    results_df['mean_q_diff'] = (results_df['mean_q'] -q_agg_0)/q_agg_0
+    results_df['var_q_diff'] = (results_df['var_q'] -q_agg_0)/q_agg_0
+    results_df['mean_cs_diff'] = (results_df['mean_cs'] -cs_agg_0)/np.absolute(cs_agg_0)
+    results_df['var_cs_diff'] = (results_df['var_cs'] -cs_agg_0)/np.absolute(cs_agg_0)
+
+    results_df.to_csv(f"ramsey_welfare_result/{file_prefix}_low_avg_bound_loss05_result.csv", index=False)
+    
+    del results_df, r_step_agg_results,cs_step_agg_results,q_step_agg_results,ev_step_agg_results
+    del r_step_agg_results_iqr,cs_step_agg_results_iqr,q_step_agg_results_iqr,ev_step_agg_results_iqr
+    
+    # Clean up memory
+    gc.collect()
+
+
+# ==============================================================================
+# 3. MAIN EXECUTION BLOCK
+# ==============================================================================
+if __name__ == "__main__":
+    # Define the range of reduction factors from 0.1 to 0.9 (incrementing by 0.1)
+    # The stop value is 1.0 because arange() does not include the stop value itself.
+    reduction_factors_to_test = np.arange(0.1, 1.0, 0.1)
+    
+    # The rest of your code remains the same
+    for factor in reduction_factors_to_test:
+        run_simulation_for_factor(reduction_factor=factor)
+        
+    print("\nAll simulations have been completed.")
+    
+    
+    
+    
+    
+#########################################
+###### Building Counterfactual NDVI  Non Dynamic #####
+#########################################    
+
+low_income_mask = (I >= 0) & (I <= 6000)
+
+reduction_factor = 0.25
+
+# Step 1: Select only the NDVI values for the low-income group
+selected_ndvi = NDVI[low_income_mask]
+
+# Step 2: Calculate new values ONLY for the positive ones in the selection
+values_to_set = jnp.where(selected_ndvi >= 0,
+                          selected_ndvi * reduction_factor,
+                          selected_ndvi) # <-- Change is here
+
+# Step 3: Use these values to update the full array
+updated_NDVI = NDVI.at[low_income_mask].set(values_to_set)
+
+input_NDVI = updated_NDVI
+
+steps = jnp.arange(-0.25, 0.3, 0.05, dtype=jnp.float32)
+
+# Lists to store results
+pl_step_agg_results = []
+ql_step_agg_results = []
+fcl_step_agg_results = []
+r_step_agg_results = []
+cs_step_agg_results = []
+q_step_agg_results = []
+ev_step_agg_results = []
+cs_step_results = []
+q_step_results = []
+r_step_results = []
+ev_step_results = []
+error_log = []  # Store errors
+
+param0_high = jnp.array([3, 8, 8, 8, 8, 
+                    2, 
+                    6-2, 11-6, 20-11,
+                    8.5, 
+                    7.125, 7.125,7.125,7.125
+                    ])
+
+param0_med = jnp.array([3, 5, 5, 5, 5, 
+                    2, 
+                    6-2, 11-6, 20-11,
+                    8.5, 
+                    7.125, 7.125,7.125,7.125
+                    ])
+
+param0_low = jnp.array([3, 3, 3, 3, 3, 
+                    2, 
+                    6-2, 11-6, 20-11,
+                    8.5, 
+                    7.125, 7.125,7.125,7.125
+                    ])
+
+
+def get_initial_param_for_step(step: np.ndarray, param_med: np.ndarray, param_low: np.ndarray) -> np.ndarray:
+    """
+    Determines the initial parameter value based on the sign of the step:
+    - step >= 0 -> param_low
+    - step < 0  -> param_med
+
+    Args:
+        step: A NumPy array (scalar) representing the current step value.
+        param_med: NumPy array for the initial parameter guess when step is negative.
+        param_low: NumPy array for the initial parameter guess when step is non-negative.
+
+    Returns:
+        A NumPy array representing the selected initial parameter guess.
+    """
+    # A single where clause is now sufficient for the two conditions.
+    return np.where(step >= 0, param_low, param_med)
+
+
+for step in steps:
+    try:
+        # Update Z_step with the current step
+        Z_step = Z_current.copy()  # Preserve original structure
+        #Z_step = Z_history.copy()  # Preserve original structure
+        Z_step = Z_current.at[:, 2].add(step)  # Modify slice (columns 3)
+        Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
+        
+        #precomputed_Z_samples = generate_mc_perturbed_Z_samples(Z_step)
+
+        # Define constraints
+        constraint_conserve = NonlinearConstraint(
+            lambda x: conservation_constraint_jitted(x, Z_step, input_NDVI), 
+            0.95, 1.0, jac='2-point', hess=BFGS()
+        )
+        #constraint_revenue = NonlinearConstraint(
+        #    lambda x: revenue_lower_bound_constraint_jitted(x, Z_step), 
+        #    0.0, jnp.inf, jac='2-point', hess=BFGS()
+        #)
+    
+        initial_param_for_step = get_initial_param_for_step(step, 
+                                                            #param0_high, 
+                                                            param0_med, param0_low)
+        param0_high_np = np.array(initial_param_for_step, dtype=jnp.float32) # Ensure NumPy conversion
+
+        # First optimization attempt
+        solution1_nobd = cobyqa.minimize(
+            lambda x: objective0_jitted(x, Z_step, input_NDVI), 
+            param0_high_np,
+            bounds=bounds0, 
+            constraints=(constraint_conserve
+                         #, constraint_revenue
+                         ), 
+            options={'disp': False, 'feasibility_tol': 1e-6, 'radius_init': 1, 'radius_final': 0.01}
+        )
+
+        solution1_nobd.x = np.array(solution1_nobd.x)
+
+        # Retry if optimization did not converge
+        if not solution1_nobd.success:
+            print(f"Step {step}: First attempt did not converge. Retrying with new initial guess.")
+            solution1_nobd_2 = cobyqa.minimize(
+                lambda x: objective0_jitted(x, Z_step, input_NDVI), 
+                np.array(solution1_nobd.x, dtype=jnp.float32),  # Ensure NumPy conversion
+                bounds=bounds0, 
+                constraints=(constraint_conserve, input_NDVI
+                             #, constraint_revenue
+                             ), 
+                options={'disp': False, 'feasibility_tol': 1e-6, 'radius_init': 1, 'radius_final': 0.01}
+            )
+            solution1_nobd_final = solution1_nobd_2
+        else:
+            print(f"Step {step}: Optimization converged successfully.")
+            solution1_nobd_final = solution1_nobd
+
+        # **Check for Constraint Violations**
+        conserve_value = conservation_constraint_jitted(solution1_nobd_final.x, Z_step, input_NDVI)
+        #revenue_value = revenue_lower_bound_constraint_jitted(solution1_nobd_final.x, Z_step)
+
+        tolerance = 1e-6
+
+        if conserve_value < (0.95 - tolerance) or conserve_value > (1.0 + tolerance):
+           raise ValueError(f"Step {step}: Conservation constraint violated! Value: {conserve_value}")
+
+        #if revenue_value < -tolerance:
+        #   raise ValueError(f"Step {step}: Revenue constraint violated! Value: {revenue_value}")
+
+        # Compute optimal price and quantities
+        p_l, q_l, fc_l = param_to_pq0_jitted(solution1_nobd_final.x)
+
+        # Process constraints
+        #processed_Z = average_Z_jitted(Z_step)
+        q_sum_hh_step = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z_step, input_NDVI)
+        r_step = from_q_to_r_jitted(q_sum_hh_step, p_l, q_l, fc_l)
+        r_step_agg = nansum_ignore_nan_inf_jitted(r_step) / 12
+        cs_step = get_v_out_jitted(q_sum_hh_step, p_l, q_l, fc_l, Z_step,input_NDVI)
+        cs_step_agg = nansum_ignore_nan_inf_jitted(cs_step) / 12
+        q_hh_step = q_sum_hh_step/sim
+        q_step_agg = nansum_ignore_nan_inf_jitted(q_hh_step) / 12
+        ev_step = get_ev_jitted(q_sum_hh_step, cs_step)
+        ev_step_agg = nansum_ignore_nan_inf_jitted(ev_step) / 12
+
+        # Append results
+        pl_step_agg_results.append(p_l)
+        ql_step_agg_results.append(q_l)
+        fcl_step_agg_results.append(fc_l)
+        r_step_agg_results.append(r_step_agg)
+        cs_step_agg_results.append(cs_step_agg)
+        q_step_agg_results.append(q_step_agg)
+        ev_step_agg_results.append(ev_step_agg)
+        cs_step_results.append(cs_step)
+        q_step_results.append(q_hh_step)
+        r_step_results.append(r_step)
+        ev_step_results.append(ev_step)
+
+
+    except ValueError as e:
+        error_log.append(str(e))  # Store error message
+        print(f"Error at step {step}: {e}")  # Optional: Print errors immediately
+
+# **Print all errors after the loop**
+if error_log:
+    print("\nErrors encountered during optimization:")
+    for err in error_log:
+        print(err)
+
+
+# Convert results to arrays for further processing
+pl_step_agg_results = jnp.array(pl_step_agg_results)
+pl_step_agg_results  = pl_step_agg_results.T
+pl_step_agg_results_df = pd.DataFrame(pl_step_agg_results)
+pl_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/half_ndvi_low_avg_bound_loss05_mean_pl.csv", index=False)
+del pl_step_agg_results, pl_step_agg_results_df
+
+ql_step_agg_results = jnp.array(ql_step_agg_results)
+ql_step_agg_results  = ql_step_agg_results.T
+ql_step_agg_results_df = pd.DataFrame(ql_step_agg_results)
+ql_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/half_ndvi_low_avg_bound_loss05_mean_ql.csv", index=False)
+del ql_step_agg_results, ql_step_agg_results_df
+
+fcl_step_agg_results = jnp.array(fcl_step_agg_results)
+fcl_step_agg_results  = fcl_step_agg_results.T
+fcl_step_agg_results_df = pd.DataFrame(fcl_step_agg_results)
+fcl_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/half_ndvi_low_avg_bound_loss05_mean_fcl.csv", index=False)
+del fcl_step_agg_results, fcl_step_agg_results_df
+
+r_step_agg_results = jnp.array(r_step_agg_results)
+r_step_agg_results_df = pd.DataFrame(r_step_agg_results)
+r_step_agg_results_df.to_csv("ramsey_welfare_result/half_ndvi_low_avg_bound_loss05_mean_r.csv", index=False)
+
+cs_step_agg_results = jnp.array(cs_step_agg_results)
+cs_step_agg_results_df = pd.DataFrame(cs_step_agg_results)
+cs_step_agg_results_df.to_csv("ramsey_welfare_result/half_ndvi_low_avg_bound_loss05_mean_cs.csv", index=False)
+
+q_step_agg_results = jnp.array(q_step_agg_results)
+q_step_agg_results_df = pd.DataFrame(q_step_agg_results)
+q_step_agg_results_df.to_csv("ramsey_welfare_result/half_ndvi_low_avg_bound_loss05_mean_q.csv", index=False)
+
+ev_step_agg_results = jnp.array(ev_step_agg_results)
+ev_step_agg_results_df = pd.DataFrame(ev_step_agg_results)
+ev_step_agg_results_df.to_csv("ramsey_welfare_result/half_ndvi_low_avg_bound_loss05_mean_ev.csv", index=False)
+
+cs_step_results = jnp.array(cs_step_results)
+cs_step_results=cs_step_results.T
+cs_step_results_df = pd.DataFrame(cs_step_results)
+cs_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/half_ndvi_low_avg_bound_loss05_mean_cs_steps.csv", index=False)
+del cs_step_results, cs_step_results_df
+
+q_step_results = jnp.array(q_step_results)
+q_step_results=q_step_results.T
+q_step_results_df = pd.DataFrame(q_step_results)
+q_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/half_ndvi_low_avg_bound_loss05_mean_q_steps.csv", index=False)
+del q_step_results, q_step_results_df
+
+r_step_results = jnp.array(r_step_results)
+r_step_results=r_step_results.T
+r_step_results_df = pd.DataFrame(r_step_results)
+r_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/half_ndvi_low_avg_bound_loss05_mean_r_steps.csv", index=False)
+del r_step_results, r_step_results_df
+
+ev_step_results = jnp.array(ev_step_results)
+ev_step_results=ev_step_results.T
+ev_step_results_df = pd.DataFrame(ev_step_results)
+ev_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/half_ndvi_low_avg_bound_loss05_mean_ev_steps.csv", index=False)
+del ev_step_results, ev_step_results_df
+
+#######################################
+#### Prepare Z for changing IQR ######
+######################################
+
+#### noted that the iqr in the demand model is iqr within month. This is not the focus of the research
+#### The research focus on the volatility across different month both within a year
+
+
+s_steps = jnp.arange(0.75, 1.25+0.05, 0.05, dtype=jnp.float32)
+
+pl_step_agg_results_iqr = []
+ql_step_agg_results_iqr = []
+fcl_step_agg_results_iqr = []
+r_step_agg_results_iqr = []
+cs_step_agg_results_iqr = []
+q_step_agg_results_iqr = []
+ev_step_agg_results_iqr = []
+cs_step_results_iqr = []
+q_step_results_iqr = []
+r_step_results_iqr = []
+ev_step_results_iqr = []
+error_log_var = []
+
+param0_high = jnp.array([3, 6.5, 6.5, 6.5, 6.5, 
+                    2, 
+                    6-2, 11-6, 20-11,
+                    8.5,
+                    7.125, 7.125, 7.125, 7.125
+                    ])
+
+param0_med = jnp.array([3, 5, 5, 5, 5, 
+                    2, 
+                    6-2, 11-6, 20-11,
+                    8.5,
+                    7.125, 7.125, 7.125, 7.125
+                    ])
+
+param0_low = jnp.array([3, 3, 3, 3, 3, 
+                    2, 
+                    6-2, 11-6, 20-11,
+                    8.5,
+                    7.125, 7.125, 7.125, 7.125
+                    ])
+
+
+def get_initial_param_for_s_step(s_step: jax.Array,
+                                 param_low: jax.Array,
+                                 param_med: jax.Array
+                                 ) -> jax.Array:
+    """
+    Determines the initial parameter value based on the s_step value:
+    - s_step <= 1 -> param_low
+    - s_step > 1  -> param_med
+
+    Args:
+        s_step: A JAX array (scalar) representing the current s_step value.
+        param_low: JAX array for the initial parameter guess when s_step <= 1.
+        param_med: JAX array for the initial parameter guess when s_step > 1.
+
+    Returns:
+        A JAX array representing the selected initial parameter guess.
+    """
+    # Use jnp.where for efficient, JIT-compatible conditional logic.
+    # Condition: s_step <= 1
+    # If True: return param_low
+    # If False: return param_med
+    return jnp.where(s_step <= 1, param_low, param_med)
+
+
+for step in s_steps:
+    try:
+        # Update Z_step with the current step
+        #Z_step = Z_history.copy()  # Preserve original structure
+        Z_step = Z_current.copy()  # Preserve original structure
+        Z_step = Z_step.at[:,2 ].set(scale_sd_non_parametric_jitted(Z_step[:, 2], step))
+        Z_step = jnp.maximum(Z_step, jnp.array(1e-16, dtype=jnp.float32))
+        
+        #precomputed_Z_samples = generate_mc_perturbed_Z_samples(Z_step)
+
+        # Define constraints
+        constraint_conserve = NonlinearConstraint(
+            lambda x: conservation_constraint_jitted(x, Z_step, input_NDVI), 
+            0.95, 1.0, jac='2-point', hess=BFGS()
+        )
+        #constraint_revenue = NonlinearConstraint(
+        #    lambda x: revenue_lower_bound_constraint_jitted(x, Z_step), 
+        #    0.0, jnp.inf, jac='2-point', hess=BFGS()
+        #)
+        
+        ### Determine the initial value based on the current step
+        # Call the function to get the initial parameter for this step
+        initial_param_for_step = get_initial_param_for_s_step(step, 
+                                                              #param0_high, 
+                                                              param0_low, param0_med)
+        param0_high_np = np.array(initial_param_for_step, dtype=jnp.float32) # Ensure NumPy conversion
+
+        # First optimization attempt
+        solution1_nobd = cobyqa.minimize(
+            lambda x: objective0(x, Z_step, input_NDVI), 
+            param0_high_np,
+            bounds=bounds0, 
+            constraints=(constraint_conserve
+                         #, constraint_revenue
+                         ), 
+            options={'disp': False, 'feasibility_tol': 1e-6, 'radius_init': 1, 'radius_final': 0.01}
+        )
+
+        solution1_nobd.x = np.array(solution1_nobd.x)
+
+        # Retry if optimization did not converge
+        if not solution1_nobd.success:
+            print(f"Step {step}: First attempt did not converge. Retrying with new initial guess.")
+            solution1_nobd_2 = cobyqa.minimize(
+                lambda x: objective0(x, Z_step, input_NDVI), 
+                np.array(solution1_nobd.x, dtype=jnp.float32),  # Ensure NumPy conversion
+                bounds=bounds0, 
+                constraints=(constraint_conserve
+                             #, constraint_revenue
+                             ), 
+                options={'disp': False, 'feasibility_tol': 1e-6, 'radius_init': 1, 'radius_final': 0.01}
+            )
+            solution1_nobd_final = solution1_nobd_2
+        else:
+            print(f"Step {step}: Optimization converged successfully.")
+            solution1_nobd_final = solution1_nobd
+
+        # **Check for Constraint Violations**
+        conserve_value = conservation_constraint_jitted(solution1_nobd_final.x, Z_step, input_NDVI)
+        #revenue_value = revenue_lower_bound_constraint_jitted(solution1_nobd_final.x, Z_step)
+
+        tolerance = 1e-6
+
+        if conserve_value < (0.95 - tolerance) or conserve_value > (1.0 + tolerance):
+           raise ValueError(f"Step {step}: Conservation constraint violated! Value: {conserve_value}")
+
+        #if revenue_value < -tolerance:
+        #   raise ValueError(f"Step {step}: Revenue constraint violated! Value: {revenue_value}")
+
+        # Compute optimal price and quantities
+        p_l, q_l, fc_l = param_to_pq0_jitted(solution1_nobd_final.x)
+
+        # Process constraints
+        #processed_Z = average_Z_jitted(Z_step)
+        q_sum_hh_step = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z_step, input_NDVI)
+        r_step = from_q_to_r_jitted(q_sum_hh_step, p_l, q_l, fc_l)
+        r_step_agg = nansum_ignore_nan_inf_jitted(r_step) / 12
+        cs_step = get_v_out_jitted(q_sum_hh_step, p_l, q_l, fc_l, Z_step, input_NDVI)
+        cs_step_agg = nansum_ignore_nan_inf_jitted(cs_step) / 12
+        q_hh_step = q_sum_hh_step/sim
+        q_step_agg = nansum_ignore_nan_inf_jitted(q_hh_step) / 12
+        ev_step = get_ev_jitted(q_sum_hh_step, cs_step)
+        ev_step_agg = nansum_ignore_nan_inf_jitted(ev_step) / 12
+
+        # Append results
+        pl_step_agg_results_iqr.append(p_l)
+        ql_step_agg_results_iqr.append(q_l)
+        fcl_step_agg_results_iqr.append(fc_l)
+        r_step_agg_results_iqr.append(r_step_agg)
+        cs_step_agg_results_iqr.append(cs_step_agg)
+        q_step_agg_results_iqr.append(q_step_agg)
+        ev_step_agg_results_iqr.append(ev_step_agg)
+        cs_step_results_iqr.append(cs_step)
+        q_step_results_iqr.append(q_hh_step)
+        r_step_results_iqr.append(r_step)
+        ev_step_results_iqr.append(ev_step)
+
+        # Clean up memory
+        del q_sum_hh_step, r_step, cs_step, q_hh_step, ev_step
+        gc.collect()
+
+    except ValueError as e:
+        error_log_var.append(str(e))  # Store error message
+        print(f"Error at step {step}: {e}")  # Optional: Print errors immediately
+
+# **Print all errors after the loop**
+if error_log_var:
+    print("\nErrors encountered during optimization:")
+    for err in error_log_var:
+        print(err)
+        
+# Convert results to arrays for further processing
+pl_step_agg_results_iqr = jnp.array(pl_step_agg_results_iqr)
+pl_step_agg_results_iqr  = pl_step_agg_results_iqr.T
+pl_step_agg_results_iqr_df = pd.DataFrame(pl_step_agg_results_iqr)
+pl_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/half_ndvi_low_avg_bound_loss05_var_pl.csv", index=False)
+del pl_step_agg_results_iqr, pl_step_agg_results_iqr_df
+
+ql_step_agg_results_iqr = jnp.array(ql_step_agg_results_iqr)
+ql_step_agg_results_iqr  = ql_step_agg_results_iqr.T
+ql_step_agg_results_iqr_df = pd.DataFrame(ql_step_agg_results_iqr)
+ql_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/half_ndvi_low_avg_bound_loss05_var_ql.csv", index=False)
+del ql_step_agg_results_iqr, ql_step_agg_results_iqr_df
+
+fcl_step_agg_results_iqr = jnp.array(fcl_step_agg_results_iqr)
+fcl_step_agg_results_iqr  = fcl_step_agg_results_iqr.T
+fcl_step_agg_results_iqr_df = pd.DataFrame(fcl_step_agg_results_iqr)
+fcl_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/half_ndvi_low_avg_bound_loss05_var_fcl.csv", index=False)
+del fcl_step_agg_results_iqr, fcl_step_agg_results_iqr_df
+
+r_step_agg_results_iqr = jnp.array(r_step_agg_results_iqr)
+r_step_agg_results_iqr_df = pd.DataFrame(r_step_agg_results_iqr)
+r_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/half_ndvi_low_avg_bound_loss05_var_r.csv", index=False)
+
+cs_step_agg_results_iqr = jnp.array(cs_step_agg_results_iqr)
+cs_step_agg_results_iqr_df = pd.DataFrame(cs_step_agg_results_iqr)
+cs_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/half_ndvi_low_avg_bound_loss05_var_cs.csv", index=False)
+
+q_step_agg_results_iqr = jnp.array(q_step_agg_results_iqr)
+q_step_agg_results_iqr_df = pd.DataFrame(q_step_agg_results_iqr)
+q_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/half_ndvi_low_avg_bound_loss05_var_q.csv", index=False)
+
+ev_step_agg_results_iqr = jnp.array(ev_step_agg_results_iqr)
+ev_step_agg_results_iqr_df = pd.DataFrame(ev_step_agg_results_iqr)
+ev_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/half_ndvi_low_avg_bound_loss05_var_ev.csv", index=False)
+
+cs_step_results_iqr = jnp.array(cs_step_results_iqr)
+cs_step_results_iqr=cs_step_results_iqr.T
+cs_step_results_iqr_df = pd.DataFrame(cs_step_results_iqr)
+cs_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/half_ndvi_low_avg_bound_loss05_var_cs_steps.csv", index=False)
+del cs_step_results_iqr, cs_step_results_iqr_df
+
+q_step_results_iqr = jnp.array(q_step_results_iqr)
+q_step_results_iqr=q_step_results_iqr.T
+q_step_results_iqr_df = pd.DataFrame(q_step_results_iqr)
+q_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/half_ndvi_low_avg_bound_loss05_var_q_steps.csv", index=False)
+del q_step_results_iqr, q_step_results_iqr_df
+
+r_step_results_iqr = jnp.array(r_step_results_iqr)
+r_step_results_iqr=r_step_results_iqr.T
+r_step_results_iqr_df = pd.DataFrame(r_step_results_iqr)
+r_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/half_ndvi_low_avg_bound_loss05_var_r_steps.csv", index=False)
+del r_step_results_iqr, r_step_results_iqr_df
+
+ev_step_results_iqr = jnp.array(ev_step_results_iqr)
+ev_step_results_iqr=ev_step_results_iqr.T
+ev_step_results_iqr_df = pd.DataFrame(ev_step_results_iqr)
+ev_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/half_ndvi_low_avg_bound_loss05_var_ev_steps.csv", index=False)
+del ev_step_results_iqr, ev_step_results_iqr_df
+
+# Convert results to DataFrame
+results_df = pd.DataFrame({
+    "steps": steps,
+    "s_steps": s_steps,
+    "mean_r": r_step_agg_results,
+    "mean_cs": cs_step_agg_results,
+    "mean_q": q_step_agg_results,
+    "mean_ev": ev_step_agg_results,
+    "var_r": r_step_agg_results_iqr,
+    "var_cs": cs_step_agg_results_iqr,
+    "var_q": q_step_agg_results_iqr,
+    "var_ev": ev_step_agg_results_iqr,
+})
+
+results_df['mean_r_diff'] = (results_df['mean_r'] -r_agg_0)/r_agg_0
+results_df['var_r_diff'] = (results_df['var_r'] -r_agg_0)/r_agg_0
+results_df['mean_q_diff'] = (results_df['mean_q'] -q_agg_0)/q_agg_0
+results_df['var_q_diff'] = (results_df['var_q'] -q_agg_0)/q_agg_0
+results_df['mean_cs_diff'] = (results_df['mean_cs'] -cs_agg_0)/np.absolute(cs_agg_0)
+results_df['var_cs_diff'] = (results_df['var_cs'] -cs_agg_0)/np.absolute(cs_agg_0)
+
+results_df.to_csv("ramsey_welfare_result/half_ndvi_low_avg_bound_loss05_result.csv", index=False)
+
+del results_df, r_step_agg_results,cs_step_agg_results,q_step_agg_results,ev_step_agg_results
+del r_step_agg_results_iqr,cs_step_agg_results_iqr,q_step_agg_results_iqr,ev_step_agg_results_iqr
+
+
+"""
 
 ########################################
 ###### CRRA Function ##########
@@ -3279,6 +4990,7 @@ param0_low = jnp.array([3, 3, 3, 3, 3,
 
 def get_initial_param_for_step(step: jax.Array, param_high: jax.Array, param_med: jax.Array, param_low: jax.Array) -> jax.Array:
     """
+"""
     Determines the initial parameter value based on the step according to specified ranges:
     - [-0.25, -0.15] -> param_high (inclusive)
     - (-0.15, 0.15)  -> param_med (exclusive)
@@ -3292,7 +5004,8 @@ def get_initial_param_for_step(step: jax.Array, param_high: jax.Array, param_med
 
     Returns:
         A JAX array representing the selected initial parameter guess.
-    """
+        """
+"""
     # Define the nominal boundary points as float32 JAX arrays
     nominal_neg_15 = jnp.array(-0.15, dtype=jnp.float32)
     nominal_pos_15 = jnp.array(0.15, dtype=jnp.float32)
@@ -3334,7 +5047,7 @@ for step in steps:
 
         # Define constraints
         constraint_conserve = NonlinearConstraint(
-            lambda x: get_mc_result_conserve_from_perturbed_Z(x, precomputed_Z_samples),
+            lambda x: conservation_constraint_jitted(x, Z_step),
             0.95, 1.0, jac='2-point', hess=BFGS()
         )
         #constraint_revenue = NonlinearConstraint(
@@ -3376,7 +5089,7 @@ for step in steps:
             solution1_nobd_final = solution1_nobd
 
         # **Check for Constraint Violations**
-        conserve_value = get_mc_result_conserve_from_perturbed_Z(solution1_nobd_final.x, precomputed_Z_samples)
+        conserve_value = conservation_constraint_jitted(solution1_nobd_final.x, Z_step)
         #revenue_value = revenue_lower_bound_crra_constraint_jitted(solution1_nobd_final.x, Z_step)
 
         tolerance = 1e-6
@@ -3399,7 +5112,7 @@ for step in steps:
         cs_step_agg = nansum_ignore_nan_inf_jitted(cs_step) / 12
         q_hh_step = q_sum_hh_step/sim
         q_step_agg = nansum_ignore_nan_inf_jitted(q_hh_step) / 12
-        ev_step = get_ev_jitted(q_sum_hh_step, p_l, q_l, fc_l, Z_step)
+        ev_step = get_ev_jitted(q_sum_hh_step, cs_step)
         ev_step_agg = nansum_ignore_nan_inf_jitted(ev_step) / 12
 
         # Append results
@@ -3434,59 +5147,59 @@ if error_log:
 pl_step_agg_results = jnp.array(pl_step_agg_results)
 pl_step_agg_results  = pl_step_agg_results.T
 pl_step_agg_results_df = pd.DataFrame(pl_step_agg_results)
-pl_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/montecarlo_weather_gamma03_bound_loss05_mean_pl.csv", index=False)
+pl_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/montecarlo_weather_gamma05_bound_loss05_mean_pl.csv", index=False)
 del pl_step_agg_results, pl_step_agg_results_df
 
 ql_step_agg_results = jnp.array(ql_step_agg_results)
 ql_step_agg_results  = ql_step_agg_results.T
 ql_step_agg_results_df = pd.DataFrame(ql_step_agg_results)
-ql_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/montecarlo_weather_gamma03_bound_loss05_mean_ql.csv", index=False)
+ql_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/montecarlo_weather_gamma05_bound_loss05_mean_ql.csv", index=False)
 del ql_step_agg_results, ql_step_agg_results_df
 
 fcl_step_agg_results = jnp.array(fcl_step_agg_results)
 fcl_step_agg_results  = fcl_step_agg_results.T
 fcl_step_agg_results_df = pd.DataFrame(fcl_step_agg_results)
-fcl_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/montecarlo_weather_gamma03_bound_loss05_mean_fcl.csv", index=False)
+fcl_step_agg_results_df.to_csv("ramsey_price_result/price_detail_results/montecarlo_weather_gamma05_bound_loss05_mean_fcl.csv", index=False)
 del fcl_step_agg_results, fcl_step_agg_results_df
 
 r_step_agg_results = jnp.array(r_step_agg_results)
 r_step_agg_results_df = pd.DataFrame(r_step_agg_results)
-r_step_agg_results_df.to_csv("ramsey_welfare_result/montecarlo_weather_gamma03_bound_loss05_mean_r.csv", index=False)
+r_step_agg_results_df.to_csv("ramsey_welfare_result/montecarlo_weather_gamma05_bound_loss05_mean_r.csv", index=False)
 
 cs_step_agg_results = jnp.array(cs_step_agg_results)
 cs_step_agg_results_df = pd.DataFrame(cs_step_agg_results)
-cs_step_agg_results_df.to_csv("ramsey_welfare_result/montecarlo_weather_gamma03_bound_loss05_mean_cs.csv", index=False)
+cs_step_agg_results_df.to_csv("ramsey_welfare_result/montecarlo_weather_gamma05_bound_loss05_mean_cs.csv", index=False)
 
 q_step_agg_results = jnp.array(q_step_agg_results)
 q_step_agg_results_df = pd.DataFrame(q_step_agg_results)
-q_step_agg_results_df.to_csv("ramsey_welfare_result/montecarlo_weather_gamma03_bound_loss05_mean_q.csv", index=False)
+q_step_agg_results_df.to_csv("ramsey_welfare_result/montecarlo_weather_gamma05_bound_loss05_mean_q.csv", index=False)
 
 ev_step_agg_results = jnp.array(ev_step_agg_results)
 ev_step_agg_results_df = pd.DataFrame(ev_step_agg_results)
-ev_step_agg_results_df.to_csv("ramsey_welfare_result/montecarlo_weather_gamma03_bound_loss05_mean_ev.csv", index=False)
+ev_step_agg_results_df.to_csv("ramsey_welfare_result/montecarlo_weather_gamma05_bound_loss05_mean_ev.csv", index=False)
 
 cs_step_results = jnp.array(cs_step_results)
 cs_step_results=cs_step_results.T
 cs_step_results_df = pd.DataFrame(cs_step_results)
-cs_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_gamma03_bound_loss05_mean_cs_steps.csv", index=False)
+cs_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_gamma05_bound_loss05_mean_cs_steps.csv", index=False)
 del cs_step_results, cs_step_results_df
 
 q_step_results = jnp.array(q_step_results)
 q_step_results=q_step_results.T
 q_step_results_df = pd.DataFrame(q_step_results)
-q_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_gamma03_bound_loss05_mean_q_steps.csv", index=False)
+q_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_gamma05_bound_loss05_mean_q_steps.csv", index=False)
 del q_step_results, q_step_results_df
 
 r_step_results = jnp.array(r_step_results)
 r_step_results=r_step_results.T
 r_step_results_df = pd.DataFrame(r_step_results)
-r_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_gamma03_bound_loss05_mean_r_steps.csv", index=False)
+r_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_gamma05_bound_loss05_mean_r_steps.csv", index=False)
 del r_step_results, r_step_results_df
 
 ev_step_results = jnp.array(ev_step_results)
 ev_step_results=ev_step_results.T
 ev_step_results_df = pd.DataFrame(ev_step_results)
-ev_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_gamma03_bound_loss05_mean_ev_steps.csv", index=False)
+ev_step_results_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_gamma05_bound_loss05_mean_ev_steps.csv", index=False)
 del ev_step_results, ev_step_results_df
 
 #######################################
@@ -3525,6 +5238,7 @@ def get_initial_param_for_s_step(s_step: jax.Array,
                                  param_low: jax.Array, 
                                  ) -> jax.Array:
     """
+"""
     Determines the initial parameter value based on the s_step according to specified ranges:
     - [0.75, 0.85] -> param_low (inclusive)
     - (0.85, 1.15) -> param_med (exclusive)
@@ -3538,7 +5252,8 @@ def get_initial_param_for_s_step(s_step: jax.Array,
 
     Returns:
         A JAX array representing the selected initial parameter guess.
-    """
+        """
+"""
     # Define the nominal boundary points as float32 JAX arrays
     nominal_0_85 = jnp.array(0.85, dtype=jnp.float32)
     nominal_1_15 = jnp.array(1.15, dtype=jnp.float32)
@@ -3591,7 +5306,7 @@ for step in s_steps:
 
         # Define constraints
         constraint_conserve = NonlinearConstraint(
-            lambda x: get_mc_result_conserve_from_perturbed_Z(x, precomputed_Z_samples), 
+            lambda x: conservation_constraint_jitted(x, Z_step), 
             0.95, 1.0, jac='2-point', hess=BFGS()
         )
         #constraint_revenue = NonlinearConstraint(
@@ -3633,7 +5348,7 @@ for step in s_steps:
             solution1_nobd_final = solution1_nobd
 
         # **Check for Constraint Violations**
-        conserve_value = get_mc_result_conserve_from_perturbed_Z(solution1_nobd_final.x, precomputed_Z_samples)
+        conserve_value = conservation_constraint_jitted(solution1_nobd_final.x, Z_step)
         #revenue_value = revenue_lower_bound_crra_constraint_jitted(solution1_nobd_final.x, Z_step)
         
         tolerance = 1e-6
@@ -3656,7 +5371,7 @@ for step in s_steps:
         cs_step_agg = nansum_ignore_nan_inf_jitted(cs_step) / 12
         q_hh_step = q_sum_hh_step/sim
         q_step_agg = nansum_ignore_nan_inf_jitted(q_hh_step) / 12
-        ev_step = get_ev_jitted(q_sum_hh_step, p_l, q_l, fc_l, Z_step)
+        ev_step = get_ev_jitted(q_sum_hh_step, cs_step)
         ev_step_agg = nansum_ignore_nan_inf_jitted(ev_step) / 12
 
         # Append results
@@ -3691,59 +5406,59 @@ if error_log_var:
 pl_step_agg_results_iqr = jnp.array(pl_step_agg_results_iqr)
 pl_step_agg_results_iqr  = pl_step_agg_results_iqr.T
 pl_step_agg_results_iqr_df = pd.DataFrame(pl_step_agg_results_iqr)
-pl_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/montecarlo_weather_gamma03_bound_loss05_var_pl.csv", index=False)
+pl_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/montecarlo_weather_gamma05_bound_loss05_var_pl.csv", index=False)
 del pl_step_agg_results_iqr, pl_step_agg_results_iqr_df
 
 ql_step_agg_results_iqr = jnp.array(ql_step_agg_results_iqr)
 ql_step_agg_results_iqr  = ql_step_agg_results_iqr.T
 ql_step_agg_results_iqr_df = pd.DataFrame(ql_step_agg_results_iqr)
-ql_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/montecarlo_weather_gamma03_bound_loss05_var_ql.csv", index=False)
+ql_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/montecarlo_weather_gamma05_bound_loss05_var_ql.csv", index=False)
 del ql_step_agg_results_iqr, ql_step_agg_results_iqr_df
 
 fcl_step_agg_results_iqr = jnp.array(fcl_step_agg_results_iqr)
 fcl_step_agg_results_iqr  = fcl_step_agg_results_iqr.T
 fcl_step_agg_results_iqr_df = pd.DataFrame(fcl_step_agg_results_iqr)
-fcl_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/montecarlo_weather_gamma03_bound_loss05_var_fcl.csv", index=False)
+fcl_step_agg_results_iqr_df.to_csv("ramsey_price_result/price_detail_results/montecarlo_weather_gamma05_bound_loss05_var_fcl.csv", index=False)
 del fcl_step_agg_results_iqr, fcl_step_agg_results_iqr_df
 
 r_step_agg_results_iqr = jnp.array(r_step_agg_results_iqr)
 r_step_agg_results_iqr_df = pd.DataFrame(r_step_agg_results_iqr)
-r_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/montecarlo_weather_gamma03_bound_loss05_var_r.csv", index=False)
+r_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/montecarlo_weather_gamma05_bound_loss05_var_r.csv", index=False)
 
 cs_step_agg_results_iqr = jnp.array(cs_step_agg_results_iqr)
 cs_step_agg_results_iqr_df = pd.DataFrame(cs_step_agg_results_iqr)
-cs_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/montecarlo_weather_gamma03_bound_loss05_var_cs.csv", index=False)
+cs_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/montecarlo_weather_gamma05_bound_loss05_var_cs.csv", index=False)
 
 q_step_agg_results_iqr = jnp.array(q_step_agg_results_iqr)
 q_step_agg_results_iqr_df = pd.DataFrame(q_step_agg_results_iqr)
-q_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/montecarlo_weather_gamma03_bound_loss05_var_q.csv", index=False)
+q_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/montecarlo_weather_gamma05_bound_loss05_var_q.csv", index=False)
 
 ev_step_agg_results_iqr = jnp.array(ev_step_agg_results_iqr)
 ev_step_agg_results_iqr_df = pd.DataFrame(ev_step_agg_results_iqr)
-ev_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/montecarlo_weather_gamma03_bound_loss05_var_ev.csv", index=False)
+ev_step_agg_results_iqr_df.to_csv("ramsey_welfare_result/montecarlo_weather_gamma05_bound_loss05_var_ev.csv", index=False)
 
 cs_step_results_iqr = jnp.array(cs_step_results_iqr)
 cs_step_results_iqr=cs_step_results_iqr.T
 cs_step_results_iqr_df = pd.DataFrame(cs_step_results_iqr)
-cs_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_gamma03_bound_loss05_var_cs_steps.csv", index=False)
+cs_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_gamma05_bound_loss05_var_cs_steps.csv", index=False)
 del cs_step_results_iqr, cs_step_results_iqr_df
 
 q_step_results_iqr = jnp.array(q_step_results_iqr)
 q_step_results_iqr=q_step_results_iqr.T
 q_step_results_iqr_df = pd.DataFrame(q_step_results_iqr)
-q_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_gamma03_bound_loss05_var_q_steps.csv", index=False)
+q_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_gamma05_bound_loss05_var_q_steps.csv", index=False)
 del q_step_results_iqr, q_step_results_iqr_df
 
 r_step_results_iqr = jnp.array(r_step_results_iqr)
 r_step_results_iqr=r_step_results_iqr.T
 r_step_results_iqr_df = pd.DataFrame(r_step_results_iqr)
-r_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_gamma03_bound_loss05_var_r_steps.csv", index=False)
+r_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_gamma05_bound_loss05_var_r_steps.csv", index=False)
 del r_step_results_iqr, r_step_results_iqr_df
 
 ev_step_results_iqr = jnp.array(ev_step_results_iqr)
 ev_step_results_iqr=ev_step_results_iqr.T
 ev_step_results_iqr_df = pd.DataFrame(ev_step_results_iqr)
-ev_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_gamma03_bound_loss05_var_ev_steps.csv", index=False)
+ev_step_results_iqr_df.to_csv("ramsey_welfare_result/cs_detail_results/montecarlo_weather_gamma05_bound_loss05_var_ev_steps.csv", index=False)
 del ev_step_results_iqr, ev_step_results_iqr_df
 
 # Convert results to DataFrame
@@ -3767,4 +5482,5 @@ results_df['var_q_diff'] = (results_df['var_q'] -q_agg_0)/q_agg_0
 results_df['mean_cs_diff'] = (results_df['mean_cs'] -cs_agg_0)/np.absolute(cs_agg_0)
 results_df['var_cs_diff'] = (results_df['var_cs'] -cs_agg_0)/np.absolute(cs_agg_0)
 
-results_df.to_csv("ramsey_welfare_result/montecarlo_weather_gamma03_bound_loss05_result.csv", index=False)
+results_df.to_csv("ramsey_welfare_result/montecarlo_weather_gamma05_bound_loss05_result.csv", index=False)
+"""

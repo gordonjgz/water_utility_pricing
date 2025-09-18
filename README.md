@@ -26,6 +26,7 @@
 ├── pre_analysis/               # Data cleaning, GIS data, and NDVI
 ├── demand/                     # Demand Estimation
 ├── price_elasticity/           # Code to generate price elasticity
+├── preliminary_intuition/      # Code related to constructing preliminary intuition of the optimal Ramsey price
 ├── counterfactual_temp/        # Counterfactual analysis that's not been used
 ├── counterfactual_ramsey/      # Counterfactual analysis of Ramsey Pricing Model
 ├── README.md                   # Project overview (this file)
