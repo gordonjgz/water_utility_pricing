@@ -234,6 +234,105 @@ academic_theme <-
     panel.grid.minor = element_line(linewidth = 0.25, color = "grey95")
   )
 
+# This single piped command creates the final, correctly ordered data frame
+household_avg <- demand_key %>%
+  group_by(prem_id) %>%
+  summarise(
+    avg_q = mean(q_0, na.rm = TRUE),
+    income = first(income)
+  ) %>%
+  ungroup() %>%
+  mutate(income_strata = case_when(
+    income <= 6000 ~ "0~6k",
+    income > 6000 & income <= 20000 ~ "6k~20k",
+    income > 20000 & income <= 45000 ~ "20k~45k",
+    income > 45000 & income <= 100000 ~ "45k~100k",
+    TRUE ~ ">100k"
+  )) %>%
+  mutate(income_strata = factor(income_strata, levels = income_order))
+
+
+# --- 3. Create a data frame for the labels ---
+# We set x_pos to -Inf to anchor the label to the far-left edge.
+label_df <- data.frame(
+  income_strata = factor(c("0~6k", "45k~100k"), levels = income_order),
+  x_pos = -Inf,       # Anchor to the far left of each panel
+  y_pos = 20,         # Align perfectly with the line
+  label = "20"
+)
+
+
+# --- 4. Generate the Plot with Margin Labels ---
+ggplot(household_avg %>% filter(avg_q <= 250 & income < 2000000), 
+       aes(x = income/1000, y = avg_q, color = income_strata)) +
+  geom_point(size = 1, alpha = 0.3) +
+  scale_color_manual(values = custom_colors) +
+  geom_hline(yintercept = 20, color = "red", linetype = "dashed", size = 1) +
+  
+  # Use geom_text with new coordinates and justification
+  geom_text(
+    data = label_df,
+    aes(x = x_pos, y = y_pos, label = label),
+    color = "red",
+    hjust = 1.5,  # Horizontally justify to push it *right* from the far-left edge
+    inherit.aes = FALSE
+  ) +
+  
+  # IMPORTANT: Turn clipping off to allow drawing outside the panel
+  coord_cartesian(ylim = c(0, 250), clip = "off") +
+  
+  facet_wrap(~ income_strata, scales = "free_x") +
+  labs(
+    title = "",
+    x = "Household Monthly Income (k$)",
+    y = "Quantity (kGal)"
+  ) +
+  academic_theme + 
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "none",
+    # Add a left margin to the whole plot to make space for the label
+    plot.margin = margin(5.5, 5.5, 5.5, 12, "pt") 
+  )
+
+# --- 3. Create a label data frame for ONLY the desired facets ---
+label_df <- data.frame(
+  income_strata = factor("0~6k", levels = income_order), # Only include the "0~6k" group
+  x_pos = -Inf,
+  y_pos = 20,
+  label = "20"
+)
+
+
+# --- 4. Generate the Plot with Filtered Data ---
+household_avg %>%
+  # --- THIS IS THE KEY NEW LINE ---
+  filter(income_strata %in% c("0~6k", ">100k") & avg_q <= 250 & income < 2000000) %>%
+  
+  ggplot(aes(x = income / 1000, y = avg_q, color = income_strata)) +
+  geom_point(size = 1, alpha = 0.3) +
+  scale_color_manual(values = custom_colors) +
+  geom_hline(yintercept = 20, color = "red", linetype = "dashed", size = 1) +
+  geom_text(
+    data = label_df,
+    aes(x = x_pos, y = y_pos, label = label),
+    color = "red",
+    hjust = 1.5,
+    inherit.aes = FALSE
+  ) +
+  coord_cartesian(ylim = c(0, 250), clip = "off") +
+  facet_wrap(~income_strata, scales = "free_x") +
+  labs(
+    title = "",
+    x = "Household Monthly Income (k$)",
+    y = "Quantity (kGal)"
+  ) +
+  academic_theme +
+  theme(
+    plot.title = element_text(hjust = 0.5),
+    legend.position = "none",
+    plot.margin = margin(5.5, 5.5, 5.5, 12, "pt")
+  )
 
 ##### current_info_avg_bound_loss05_mean ########
 
@@ -6777,26 +6876,12 @@ avg_gamma005_var_loss05 <- ggarrange(combined_grids_with_outer_labels, common_le
 avg_mean_high_stratus = current_info_avg_bound_loss05_mean_ev_steps_rate[which(current_info_avg_bound_loss05_mean_ev_steps_rate$income_strata==">100k"),]
 avg_mean_low_stratus = current_info_avg_bound_loss05_mean_ev_steps_rate[which(current_info_avg_bound_loss05_mean_ev_steps_rate$income_strata=="0~6k"),]
 
-gamma025_mean_high_stratus = current_info_gamma025_bound_loss05_mean_ev_steps_rate[which(current_info_gamma025_bound_loss05_mean_ev_steps_rate$income_strata==">100k"),]
-gamma025_mean_low_stratus = current_info_gamma025_bound_loss05_mean_ev_steps_rate[which(current_info_gamma025_bound_loss05_mean_ev_steps_rate$income_strata=="0~6k"),]
+#gamma025_mean_high_stratus = current_info_gamma025_bound_loss05_mean_ev_steps_rate[which(current_info_gamma025_bound_loss05_mean_ev_steps_rate$income_strata==">100k"),]
+#gamma025_mean_low_stratus = current_info_gamma025_bound_loss05_mean_ev_steps_rate[which(current_info_gamma025_bound_loss05_mean_ev_steps_rate$income_strata=="0~6k"),]
 
-avg_low = ggplot(avg_mean_low_stratus, aes(x = q_0, y = rate_0.25)) +
-  geom_hex(bins = 75, color = "white", size = 0.1) +
-  scale_fill_viridis_c(trans = "log10",
-                       option = "D",
-                       direction = -1,
-                       bquote(log[10](Count~of~Observations))) +
-  coord_cartesian(#xlim = c(0, 500),
-                  ylim = c(-90, 10)
-                  ) +
+avg_mean_high_stratus_q = current_info_avg_bound_loss05_mean_q_steps_rate[which(current_info_avg_bound_loss05_mean_q_steps_rate$income_strata==">100k"),]
+avg_mean_low_stratus_q = current_info_avg_bound_loss05_mean_q_steps_rate[which(current_info_avg_bound_loss05_mean_q_steps_rate$income_strata=="0~6k"),]
 
-  labs(title = "Linear Constraint - 0~6k", # Updated title to reflect rate_0.25
-    x = "Initial Quantity (q_0) (kGal)",
-    y =expression("EV/I when "~zeta[1] ~ "=0.25"), # Updated y-axis label to reflect rate_0.25
-    fill = "Log10(Count of Observations)") +
-  
-  academic_theme +
-  theme(plot.title = element_text(hjust = 0.5))
 
 gamma025_low = ggplot(gamma025_mean_low_stratus, aes(x = q_0, y = rate_0.25)) +
   geom_hex(bins = 75, color = "white", size = 0.1) +
@@ -6804,13 +6889,13 @@ gamma025_low = ggplot(gamma025_mean_low_stratus, aes(x = q_0, y = rate_0.25)) +
                        option = "D",
                        direction = -1,
                        bquote(log[10](Count~of~Observations))) +
-  coord_cartesian(#xlim = c(0, 500),
+  coord_cartesian(xlim = c(0, 250),
                   ylim = c(-90, 10)
                   ) +
   
   labs(title = "Concave Constraint - 0~6k",
     x = "Initial Quantity (q_0) (kGal)",
-    y =expression("EV/I when "~zeta[1] ~ "=0.25"), # Updated y-axis label to reflect rate_0.25
+    y =expression("EV/I (%) when "~zeta[1] ~ "=0.25"), # Updated y-axis label to reflect rate_0.25
     fill = "Log10(Count of Observations)") +
   
   academic_theme +
@@ -6825,24 +6910,6 @@ avg_gamma025_low <- ggarrange(
 )
 
 
-avg_high = ggplot(avg_mean_high_stratus, aes(x = q_0, y = rate_0.25)) +
-  geom_hex(bins = 75, color = "white", size = 0.1) +
-  scale_fill_viridis_c(trans = "log10",
-                       option = "D",
-                       direction = -1,
-                       bquote(log[10](Count~of~Observations))) +
-  coord_cartesian(#xlim = c(0, 500),
-                  ylim = c(-9, 1)
-                  ) +
-  
-  labs(title = "Linear Constraint - >100k", # Updated title to reflect rate_0.25
-    x = "Initial Quantity (q_0) (kGal)",
-    y =expression("EV/I when "~zeta[1] ~ "=0.25"), # Updated y-axis label to reflect rate_0.25
-    fill = "Log10(Count of Observations)") +
-  
-  academic_theme +
-  theme(plot.title = element_text(hjust = 0.5))
-
 gamma025_high = ggplot(gamma025_mean_high_stratus, aes(x = q_0, y = rate_0.25)) +
   geom_hex(bins = 75, color = "white", size = 0.1) +
   scale_fill_viridis_c(trans = "log10",
@@ -6855,7 +6922,7 @@ gamma025_high = ggplot(gamma025_mean_high_stratus, aes(x = q_0, y = rate_0.25)) 
   
   labs(title = "Concave Constraint- >100k",
     x = "Initial Quantity (q_0) (kGal)",
-    y =expression("EV/I when "~zeta[1] ~ "=0.25"), # Updated y-axis label to reflect rate_0.25
+    y =expression("EV/I (%) when "~zeta[1] ~ "=0.25"), # Updated y-axis label to reflect rate_0.25
     fill = "Log10(Count of Observations)") +
   
   academic_theme +
@@ -6869,8 +6936,346 @@ avg_gamma025_high <- ggarrange(
   legend = "bottom" # Place the common legend on the right
 )
 
+avg_mean_low_stratus$`q_-0.25` = avg_mean_low_stratus_q$`-0.25`
+avg_mean_high_stratus$`q_-0.25` = avg_mean_high_stratus_q$`-0.25`
+
+avg_mean_low_stratus = avg_mean_low_stratus %>% 
+  group_by(prem_id) %>%
+  summarise(ev_dry = mean(`-0.25`),
+            ev_rate_dry = mean(`rate_-0.25`),
+            q_dry = mean(`q_-0.25`),
+            q_0 = mean(q_0))
+
+avg_mean_high_stratus = avg_mean_high_stratus %>% 
+  group_by(prem_id) %>%
+  summarise(ev_dry = mean(`-0.25`),
+            ev_rate_dry = mean(`rate_-0.25`),
+            q_dry = mean(`q_-0.25`),
+            q_0 = mean(q_0))
+
+# 1. Filter the dataframes based on your criteria
+filtered_low_stratus <- avg_mean_low_stratus %>%
+  filter(q_0 >= 0 & q_0 <= 250 & ev_rate_dry > -100)
+
+filtered_high_stratus <- avg_mean_high_stratus %>%
+  filter(q_0 >= 0 & q_0 <= 250 & ev_rate_dry > -100)
+
+low_sample <- avg_mean_low_stratus %>% 
+  filter(q_0 >= 0 & q_0 <= 250) %>% # Note: I removed the y-filter for a fuller picture
+  #slice_sample(n = 50000) %>% 
+  mutate(category = "0 - 6k")
+
+high_sample <- avg_mean_high_stratus %>%
+  filter(q_0 >= 0 & q_0 <= 250) %>% # Note: I removed the y-filter for a fuller picture
+  #slice_sample(n = 50000) %>%
+  mutate(category = ">100k")
+
+combined_data <- bind_rows(low_sample, high_sample) %>%
+  # 1. SET FACET ORDER: Convert category to a factor with a specific order
+  mutate(category = factor(category, levels = c("0 - 6k", ">100k")))
 
 
+# --- Plotting ---
+final_simple_plot <- ggplot(combined_data, aes(x = q_dry, y = ev_rate_dry, color = category)) +
+  
+  geom_point(alpha = 0.4, size = 1.5) +
+  
+  scale_color_manual(values = c("0 - 6k" = "#e22959", ">100k" = "#234043")) +
+  
+  # 2. SYNCHRONIZE Y-AXIS: Change "free_y" to "fixed"
+  facet_wrap(~ category, scales = "fixed") +
+  
+  labs(
+    title = "",
+    x = "Counterfactual Quantity (kGal)",
+    y = expression("EV/I (%) when " ~ zeta[1] ~ "=-0.25")
+  ) +
+  my_plot_theme+
+  theme(
+    #plot.title = element_text(hjust = 0.5),
+    legend.position = "none" 
+  )
+
+# Print the final plot
+print(final_simple_plot)
+
+##### Individual Level - Low Stratus ####
+
+demand_char = demand_2018_using_new_small %>%
+  select(charge, NDVI, deflator, total_housevalue, bathroom, bedroom, spa, spa_area,
+         fountain_wtr, fountain_wtr_area, heavy_water_app, heavy_water_app_area,hvac_residential,
+         house_area, lawn_area, heavy_water_spa, heavy_water_spa_area,prev_NDVI, total_area, lawn_percentage,mean_e_diff,
+         mean_TMAX_1, IQR_TMAX_1, total_PRCP, IQR_PRCP
+  )
+#rm(demand_2018_using_new_small)
+
+
+demand_char = demand_char %>%
+  #select(mean_TMAX_1, IQR_TMAX_1, total_PRCP, IQR_PRCP) %>%
+  mutate(total_PRCP_dry = pmax(total_PRCP - 0.25, 1e-16) ,
+         total_PRCP_wet = pmax(total_PRCP + 0.25, 1e-16)
+  )
+
+current_info_avg_bound_loss05_mean_ev_steps_rate = cbind(current_info_avg_bound_loss05_mean_ev_steps_rate, demand_char)
+
+current_info_avg_bound_loss05_mean_ev_steps_rate$quantity_dry = current_info_avg_bound_loss05_mean_q_steps_rate$`-0.25`
+current_info_avg_bound_loss05_mean_ev_steps_rate$quantity_wet = current_info_avg_bound_loss05_mean_q_steps_rate$`0.25`
+current_info_avg_bound_loss05_mean_ev_steps_rate$payment_dry = current_info_avg_bound_loss05_mean_r_steps_rate$`-0.25`
+current_info_avg_bound_loss05_mean_ev_steps_rate$payment_wet = current_info_avg_bound_loss05_mean_r_steps_rate$`0.25`
+current_info_avg_bound_loss05_mean_ev_steps_rate$cs_dry = current_info_avg_bound_loss05_mean_cs_steps_rate$`-0.25`
+current_info_avg_bound_loss05_mean_ev_steps_rate$cs_wet = current_info_avg_bound_loss05_mean_cs_steps_rate$`0.25`
+
+current_info_avg_bound_loss05_mean_ev_steps_rate$cs_dry_diff = current_info_avg_bound_loss05_mean_ev_steps_rate$cs_dry - current_info_avg_bound_loss05_mean_ev_steps_rate$cs_0
+current_info_avg_bound_loss05_mean_ev_steps_rate$cs_wet_diff = current_info_avg_bound_loss05_mean_ev_steps_rate$cs_wet - current_info_avg_bound_loss05_mean_ev_steps_rate$cs_0
+
+avg_mean_high_stratus = current_info_avg_bound_loss05_mean_ev_steps_rate[which(current_info_avg_bound_loss05_mean_ev_steps_rate$income_strata==">100k"),]
+avg_mean_low_stratus = current_info_avg_bound_loss05_mean_ev_steps_rate[which(current_info_avg_bound_loss05_mean_ev_steps_rate$income_strata=="0~6k"),]
+
+cs_check = avg_mean_low_stratus %>%
+  select(cs_dry_diff, `-0.25`, cs_wet_diff, `0.25`)
+
+avg_mean_low_stratus_prem_id = avg_mean_low_stratus %>% 
+  group_by(prem_id) %>%
+  summarise(q0 = mean(q_0),
+            r0 = mean(r_0),
+            ev_dry = mean(`-0.25`),
+            ev_wet = mean(`0.25`),
+            quantity_dry = mean(quantity_dry),
+            quantity_wet = mean(quantity_wet),
+            payment_dry = mean(payment_dry),
+            payment_wet = mean(payment_wet),
+            ev_wet = mean(`0.25`),
+            ev_rate_dry = mean(`rate_-0.25`),
+            ev_rate_wet = mean(rate_0.25),
+            income = mean(income)
+            )
+
+avg_mean_low_stratus_prem_id = avg_mean_low_stratus_prem_id %>%
+  mutate(q_dry_diff = quantity_dry - q0,
+         q_wet_diff = quantity_wet - q0,
+         r_dry_diff = payment_dry - r0,
+         r_wet_diff = payment_wet - r0)
+
+long_data <- avg_mean_low_stratus_prem_id %>%
+  pivot_longer(
+    cols = ends_with("_dry") | ends_with("_wet"),
+    # Use a regex pattern instead of names_sep
+    # This correctly separates "evrate" from "dry"
+    names_pattern = "(.*)_(dry|wet)",
+    names_to = c(".value", "condition")
+  )
+
+plot_variable_by_condition <- function(data, x_variable, variable_name) {
+  
+  # Create a more readable title from the variable name
+  pretty_title <- str_replace_all(variable_name, "_", " ") %>% str_to_title()
+  
+  ggplot(data, aes(x = x_variable, y = .data[[variable_name]], color = condition)) +
+    geom_point(alpha = 0.7, size = 2) +
+    scale_color_manual(
+      name = "Condition",
+      values = c("dry" = "#D55E00", "wet" = "#0072B2")
+    ) +
+    labs(
+      title = paste(pretty_title, "vs. q0 by Condition"),
+      x = as.character(x_variable),
+      y = pretty_title
+    ) +
+    theme_minimal()
+}
+
+plot_variable_by_condition(long_data, long_data$q0, "ev")
+
+ggplot(avg_mean_low_stratus_prem_id, aes(x = q_dry_diff, y = r_dry_diff, color = "#D55E00")) +
+  geom_point(alpha = 0.7, size = 2) +
+  theme_minimal()
+
+#### In dry condition, there are people who consume more and there are people who consume less. but almost all of them pay more. 
+#### They all use less water (due to the conservation constraint), but in wet condition, they all pay less, and in dry condition, they are pay more. 
+### For the demand system CS go up, but why EV went down?
+
+#### I am using less and paying less, get higher CS, why EV is lower?
+#### EV is measuring the welfare impact of price change. Price either higher in marginal price or lower the cutoff point, making the price essentially higher.
+#### The reason for the higher price is to satisfy the conservation constraint.
+
+##### What is causing the heterogeneity?
+
+current_info_avg_bound_loss05_mean_ev_steps_rate = current_info_avg_bound_loss05_mean_ev_steps_rate %>%
+  mutate(high_q = case_when(
+    q_0 >=20 ~ 1,
+    q_0 < 20 ~ 0
+  ))
+
+# Create a new column where the unit is 100 sq ft
+current_info_avg_bound_loss05_mean_ev_steps_rate$hvac_res_100sqft <- current_info_avg_bound_loss05_mean_ev_steps_rate$hvac_residential / 100
+current_info_avg_bound_loss05_mean_ev_steps_rate$house_value_th <- current_info_avg_bound_loss05_mean_ev_steps_rate$total_housevalue / 1000
+
+breaks <- quantile(current_info_avg_bound_loss05_mean_ev_steps_rate$hvac_res_100sqft, probs = c(0, 0.25, 0.5, 0.75, 1))
+
+current_info_avg_bound_loss05_mean_ev_steps_rate <- current_info_avg_bound_loss05_mean_ev_steps_rate %>%
+  mutate(hvac_category = cut(hvac_res_100sqft,
+                             breaks = breaks,
+                             labels = c("Low", "Medium-Low", "Medium-High", "High"),
+                             include.lowest = TRUE)) # Ensures the minimum value is included
+
+avg_mean_high_stratus = current_info_avg_bound_loss05_mean_ev_steps_rate[which(current_info_avg_bound_loss05_mean_ev_steps_rate$income_strata==">100k"),]
+avg_mean_low_stratus = current_info_avg_bound_loss05_mean_ev_steps_rate[which(current_info_avg_bound_loss05_mean_ev_steps_rate$income_strata=="0~6k"),]
+
+avg_mean_sum = current_info_avg_bound_loss05_mean_ev_steps_rate %>%
+  group_by(prem_id) %>%
+  summarise(q_0 = mean(q_0),
+            total_housevalue = first(total_housevalue),
+            prev_NDVI = mean(prev_NDVI),
+            bathroom = first(bathroom),
+            bedroom = first(bedroom),
+            spa_area = first(spa_area),
+            fountain_wtr_area = first(fountain_wtr_area),
+            heavy_water_app_area = first(heavy_water_app_area),
+            hvac_residential = first(hvac_residential),
+            lawn_area = first(lawn_area),
+            lawn_percentage = first(lawn_percentage),
+            income = mean(income),
+            incomne_strata = first(income_strata)
+            )
+
+avg_mean_sum = avg_mean_sum %>%
+  mutate(high_q = case_when(
+    q_0 >=20 ~ 1,
+    q_0 < 20 ~ 0
+  ))
+
+
+avg_mean_high_stratus_sum = avg_mean_sum %>% filter (incomne_strata == ">100k")
+avg_mean_low_stratus_sum = avg_mean_sum %>% filter (incomne_strata == "0~6k")
+
+library(brglm2)
+model_low <- glm(high_q ~ house_value_th*total_PRCP + prev_NDVI*total_PRCP + bathroom*total_PRCP + bedroom * total_PRCP
+                 + spa_area*total_PRCP + heavy_water_app_area*total_PRCP + 
+                   hvac_category*total_PRCP + lawn_percentage*total_PRCP, 
+                    data = avg_mean_low_stratus, 
+                    family = "binomial",
+                    method = "brglmFit")
+
+summary(model_low)
+#Call:
+#  glm(formula = high_q ~ house_value_th * total_PRCP + prev_NDVI * 
+#        total_PRCP + bathroom * total_PRCP + bedroom * total_PRCP + 
+#        spa_area * total_PRCP + heavy_water_app_area * total_PRCP + 
+#        hvac_category * total_PRCP + lawn_percentage * total_PRCP, 
+#      family = "binomial", data = avg_mean_low_stratus, method = "brglmFit")
+
+#Deviance Residuals: 
+#  Min       1Q   Median       3Q      Max  
+#-2.7668  -0.5545  -0.1057  -0.0050   3.5464  
+
+#Coefficients:
+#  Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)                         -1.031e+00  1.383e-01  -7.458 8.81e-14 ***
+#  house_value_th                      -4.073e-03  1.065e-04 -38.242  < 2e-16 ***
+#  total_PRCP                          -2.345e+00  1.375e-01 -17.061  < 2e-16 ***
+#  prev_NDVI                            5.294e+00  1.290e-01  41.048  < 2e-16 ***
+#  bathroom                             2.093e-01  1.922e-02  10.892  < 2e-16 ***
+#  bedroom                             -1.611e-02  1.618e-02  -0.996  0.31938    
+#spa_area                             2.655e-03  2.011e-04  13.203  < 2e-16 ***
+#  heavy_water_app_area                -9.095e-02  1.986e-01  -0.458  0.64702    
+#hvac_categoryMedium-Low              4.144e-01  3.202e-02  12.944  < 2e-16 ***
+#  hvac_categoryMedium-High             6.964e-01  4.165e-02  16.721  < 2e-16 ***
+#  hvac_categoryHigh                    1.009e+00  5.689e-02  17.739  < 2e-16 ***
+#  lawn_percentage                      2.117e-01  1.555e-01   1.361  0.17349    
+#house_value_th:total_PRCP            1.971e-03  9.107e-05  21.639  < 2e-16 ***
+#  total_PRCP:prev_NDVI                -3.692e-01  1.245e-01  -2.965  0.00303 ** 
+#  total_PRCP:bathroom                 -6.639e-02  1.701e-02  -3.902 9.52e-05 ***
+#  total_PRCP:bedroom                   1.654e-03  1.470e-02   0.112  0.91043    
+#total_PRCP:spa_area                 -1.169e-03  1.144e-04 -10.222  < 2e-16 ***
+#  total_PRCP:heavy_water_app_area      1.102e-01  1.524e-01   0.723  0.46945    
+#total_PRCP:hvac_categoryMedium-Low  -1.037e-01  3.343e-02  -3.101  0.00193 ** 
+#  total_PRCP:hvac_categoryMedium-High  3.744e-02  3.871e-02   0.967  0.33348    
+#total_PRCP:hvac_categoryHigh         1.280e-01  4.755e-02   2.691  0.00712 ** 
+#  total_PRCP:lawn_percentage           4.717e-01  1.554e-01   3.036  0.00240 ** 
+#  ---
+#  Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+#(Dispersion parameter for binomial family taken to be 1)
+
+#Null deviance: 171816  on 171898  degrees of freedom
+#Residual deviance: 107995  on 171877  degrees of freedom
+#AIC:  108039
+
+#Type of estimator: AS_mixed (mixed bias-reducing adjusted score equations)
+#Number of Fisher Scoring iterations: 13
+
+model_high <- glm(high_q ~ house_value_th*total_PRCP + prev_NDVI*total_PRCP + bathroom*total_PRCP + bedroom * total_PRCP
+                 + spa_area*total_PRCP + heavy_water_app_area*total_PRCP + 
+                   hvac_category*total_PRCP + lawn_percentage*total_PRCP, 
+                 data = avg_mean_high_stratus, 
+                 family = "binomial",
+                 method = "brglmFit")
+
+summary(model_high)
+
+#Call:
+#  glm(formula = high_q ~ house_value_th * total_PRCP + prev_NDVI * 
+#        total_PRCP + bathroom * total_PRCP + bedroom * total_PRCP + 
+#        spa_area * total_PRCP + heavy_water_app_area * total_PRCP + 
+#        hvac_category * total_PRCP + lawn_percentage * total_PRCP, 
+#      family = "binomial", data = avg_mean_high_stratus, method = "brglmFit")
+
+#Deviance Residuals: 
+#  Min       1Q   Median       3Q      Max  
+#-3.9587  -0.4532  -0.0374   0.6490   3.9350  
+
+#Coefficients:
+#  Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)                         -9.509e-01  2.334e-01  -4.075 4.61e-05 ***
+#  house_value_th                       3.193e-04  2.507e-05  12.739  < 2e-16 ***
+#  total_PRCP                          -1.569e+00  1.893e-01  -8.291  < 2e-16 ***
+#  prev_NDVI                            4.550e+00  2.265e-01  20.084  < 2e-16 ***
+#  bathroom                            -1.155e-02  9.001e-03  -1.284  0.19925    
+#bedroom                             -3.880e-02  8.667e-03  -4.477 7.57e-06 ***
+#  spa_area                            -2.149e-03  8.812e-04  -2.439  0.01472 *  
+#  heavy_water_app_area                -9.840e-05  2.207e-05  -4.458 8.26e-06 ***
+#  hvac_categoryMedium-Low             -9.072e-02  2.439e-01  -0.372  0.70992    
+#hvac_categoryMedium-High             8.660e-01  2.003e-01   4.323 1.54e-05 ***
+#  hvac_categoryHigh                    1.332e+00  1.846e-01   7.213 5.46e-13 ***
+#  lawn_percentage                      3.328e-02  1.838e-01   0.181  0.85635    
+#house_value_th:total_PRCP           -3.041e-05  7.125e-06  -4.269 1.97e-05 ***
+#  total_PRCP:prev_NDVI                -8.509e-01  1.349e-01  -6.308 2.84e-10 ***
+#  total_PRCP:bathroom                  2.026e-02  4.367e-03   4.639 3.50e-06 ***
+#  total_PRCP:bedroom                   1.336e-02  4.556e-03   2.934  0.00335 ** 
+#  total_PRCP:spa_area                 -5.322e-04  5.151e-04  -1.033  0.30158    
+#total_PRCP:heavy_water_app_area      2.505e-05  8.856e-06   2.828  0.00468 ** 
+#  total_PRCP:hvac_categoryMedium-Low   2.147e-01  2.182e-01   0.984  0.32501    
+#total_PRCP:hvac_categoryMedium-High -1.002e-01  1.801e-01  -0.557  0.57784    
+#total_PRCP:hvac_categoryHigh         2.092e-01  1.691e-01   1.237  0.21604    
+#total_PRCP:lawn_percentage           1.818e-01  1.076e-01   1.690  0.09110 .  
+#---
+#  Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+
+#(Dispersion parameter for binomial family taken to be 1)
+
+#Null deviance: 88883  on 65363  degrees of freedom
+#Residual deviance: 48484  on 65342  degrees of freedom
+#AIC:  48528
+
+#Type of estimator: AS_mixed (mixed bias-reducing adjusted score equations)
+#Number of Fisher Scoring iterations: 5
+
+library(lme4)
+
+avg_mean_low_stratus$prem_id <- factor(avg_mean_low_stratus$prem_id)
+
+avg_mean_low_stratus$house_value_scaled <- scale(avg_mean_low_stratus$house_value_th)
+avg_mean_low_stratus$NDVI_scaled <- scale(avg_mean_low_stratus$prev_NDVI)
+avg_mean_low_stratus$lawn_percentage_c <- avg_mean_low_stratus$lawn_percentage - mean(avg_mean_low_stratus$lawn_percentage)
+
+model_low <- glmer(high_q ~ house_value_scaled*total_PRCP + NDVI_scaled*total_PRCP + 
+                              bathroom*total_PRCP  + spa_area*total_PRCP  + 
+                              hvac_category*total_PRCP + 
+                              (1 | prem_id), # Keep the random effect
+                            data = avg_mean_low_stratus,
+                            family = "binomial")
+
+summary(model_low)
 
 #### Rm Sd decrease ####
 avg_mean_bill_ym  = current_info_avg_bound_loss05_mean_r_steps_rate %>%
