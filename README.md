@@ -1,4 +1,4 @@
-# 💧 Rain or Shine? Optimal Utility Pricing under Weather Variability
+# 💧 Rain or Shine? Optimal Utility Pricing under Extreme Weather
 
 **Author**: Gordon Ji  
 **Degree**: Ph.D. in Economics  
@@ -30,9 +30,11 @@
 ├── counterfactual_temp/        # Counterfactual analysis that's not been used
 ├── counterfactual_ramsey/      # Counterfactual analysis of Ramsey Pricing Model
 ├── README.md                   # Project overview (this file)
-├── Gordon_JI_CV.pdf            # CV
-├── gordonji_jmp_2026.pdf      # Job Market Paper (Last edited June 2025)
-├── Other Paper/               # Other Paper authored by me
+├── Gordon_JI_CV.pdf            # CV_academia
+├── Gordon_JI-CV.pdf            # CV_industry
+├── gordonji_jmp_2026.pdf       # Job Market Paper (Last edited June 2025)
+├── other_paper/                # Other Paper authored by me
+├── teaching/                   # Related Teaching Materials (Teaching Statement, Syllabus, etc. )
 └── README.md                   # Project overview (this file)
 
 ```
