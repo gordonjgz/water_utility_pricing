@@ -1,4 +1,4 @@
-# 💧 Rain or Shine? Optimal Utility Pricing under Weather Variability
+# 💧 Rain or Shine? Optimal Utility Pricing under Extreme Weather
 
 **Author**: Gordon Ji  
 **Degree**: Ph.D. in Economics  
@@ -11,13 +11,13 @@
 
 ## 📄 Abstract
 
-> As climate change amplifies extreme weather conditions, water utilities face increasingly volatile demand and revenue, challenging the ability of fixed Increasing Block Prices (IBP) to simultaneously ensure revenue feasibility, promote conservation, and protect low-income consumers.
-> This paper tests whether price alone can achieve these competing policy goals under such conditions.
-> Using granular household data from Austin, TX, and a structural demand model enhanced with satellite imagery-derived vegetation index, I find that the presence of high-quantity consumers across all income levels undermines the effectiveness of IBP.
+> As climate change amplifies extreme weather, water utilities face increasing difficulty in simultaneously ensuring revenue feasibility, promoting water conservation, and protecting low-income consumers.
+> This paper tests and concludes that price alone cannot achieve these competing policy goals under extreme weather.
+> Using granular household data from Austin, TX, and a structural demand model enhanced with satellite imagery-derived vegetation index, I find that because high-water users exist across all income levels, traditional tiered pricing doesn’t work as intended.
 > Furthermore, higher-income households—who are both weather-sensitive and surprisingly price-elastic—complicate the utility's ability to achieve its distributional objectives while meeting conservation and revenue targets.
-> Empirically, when extreme weather shifts the demand curve rightward (e.g., during a drought), the conservation constraint becomes binding, imposing a disproportionate welfare loss on the lowest-income stratum, averaging \$60.92 per household per month.
-> Conversely, when demand shifts leftward (e.g., during rainy periods), revenue concerns become binding, also imposing a disproportionate loss on the same group, averaging \$63.65 per household per month.
-> These results highlight the necessity of complementary policies to achieve distributional goals. For example, encouraging households to zeroscaping/xeriscaping by 20\% could generate \$57.35 in welfare per household per month for the lowest-income stratum, almost nullifying the welfare loss from the conservation policy’s shadow cost.
+> When high-demand conditions (e.g., drought) make conservation measures necessary, low-income families experience an average welfare loss of $61 per month. Conversely, when low-demand conditions lead to revenue shortfalls for the utility, the resulting rate adjustments also impose a significant loss on this same group, averaging $64 per month.
+> These results highlight the necessity of complementary policies to achieve distributional goals.
+> For example, a program encouraging households to convert 20% of their lawns to water-saving landscapes (zeroscaping/xeriscaping) could generate approximately $57 per month in welfare for the lowest-income families, nearly offsetting the financial burden imposed by conservation policies during droughts.
 
 ---
 ## 📂 Repository Structure
@@ -30,9 +30,11 @@
 ├── counterfactual_temp/        # Counterfactual analysis that's not been used
 ├── counterfactual_ramsey/      # Counterfactual analysis of Ramsey Pricing Model
 ├── README.md                   # Project overview (this file)
-├── Gordon_JI_CV.pdf            # CV
-├── gordonji_jmp_2026.pdf      # Job Market Paper (Last edited June 2025)
-├── Other Paper/               # Other Paper authored by me
+├── Gordon_JI_CV.pdf            # CV_academia
+├── Gordon_JI-CV.pdf            # CV_industry
+├── gordonji_jmp_2026.pdf       # Job Market Paper (Last edited June 2025)
+├── other_paper/                # Other Paper authored by me
+├── teaching/                   # Related Teaching Materials (Teaching Statement, Syllabus, etc. )
 └── README.md                   # Project overview (this file)
 
 ```
