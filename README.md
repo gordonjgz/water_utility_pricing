@@ -30,11 +30,8 @@
 ├── counterfactual_temp/        # Counterfactual analysis that's not been used
 ├── counterfactual_ramsey/      # Counterfactual analysis of Ramsey Pricing Model
 ├── README.md                   # Project overview (this file)
-├── Gordon_JI_CV.pdf            # CV_academia
-├── Gordon_JI-CV.pdf            # CV_industry
 ├── gordonji_jmp_2026.pdf       # Job Market Paper (Last edited June 2025)
-├── other_paper/                # Other Paper authored by me
-├── teaching/                   # Related Teaching Materials (Teaching Statement, Syllabus, etc. )
+├── other_app_info/             # Other Materials of Job Market Application (Teaching Materials, CV, etc)
 └── README.md                   # Project overview (this file)
 
 ```
