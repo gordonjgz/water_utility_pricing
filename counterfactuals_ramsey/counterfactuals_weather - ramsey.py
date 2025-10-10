@@ -2352,13 +2352,48 @@ inverse_crra_jitted = jax.jit(inverse_crra)
 ######### No Monte Carlo #####################
 ###############################################################
 
+weight = jnp.divide(1, I)
+
+def create_median_normalized_weights(income_array):
+    """
+    Calculates equity weights for a social welfare function, normalized by the median.
+
+    This method is preferred for highly skewed income distributions as it is robust
+    to outliers. A household whose inverse income is the median will receive a
+    weight of 1. Lower-income households get a weight > 1, and higher-income
+    households get a weight < 1.
+
+    Args:
+        income_array: A JAX numpy array of household incomes.
+
+    Returns:
+        A JAX numpy array of median-normalized weights.
+    """
+    # To avoid division by zero or negative incomes, add a small epsilon
+    # or ensure data is clean beforehand.
+    safe_incomes = jnp.maximum(income_array, 1e-6)
+
+    # 1. Calculate the inverse of the incomes
+    inverse_incomes = 1.0 / safe_incomes
+
+    # 2. Find the median of the inverse incomes
+    median_of_inverse_incomes = jnp.median(inverse_incomes)
+
+    # 3. Create the normalized weights
+    normalized_weights = inverse_incomes / median_of_inverse_incomes
+
+    return normalized_weights
+
+equity_weights = create_median_normalized_weights(I)
+
 def get_result (p_l, q_l, fc_l, Z, ndv):
     q_sum_hh = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z,ndv)
     r = from_q_to_r_jitted(q_sum_hh, p_l, q_l, fc_l)
     r_sum_filtered = nansum_ignore_nan_inf_jitted(r)
     cs = get_v_out_jitted(q_sum_hh, p_l, q_l, fc_l, Z, ndv)
     ev = get_ev_jitted(q_sum_hh, cs)
-    ev_ratio_fullyear = nansum_ignore_nan_inf_jitted(jnp.divide(ev, I))
+    w = equity_weights
+    ev_ratio_fullyear = nansum_ignore_nan_inf_jitted(jnp.multiply(ev, w))
     loss = -1 * lambda_* loss_function_jitted(r_sum_filtered - r0_sum_filtered)
     result =ev_ratio_fullyear + loss
     return result
@@ -3039,6 +3074,150 @@ except ValueError:
 jax.profiler.start_server(9999)
 print("Started JAX profiler server on port 9999.")
 """
+
+########################################
+######### Estimating Lambda ###########
+########################################
+input_NDVI = NDVI
+
+def get_result_lambda(p_l, q_l, fc_l, Z, ndv, r0_sum_filtered, lambda_val, weights):
+    """
+    Objective function that now takes lambda and weights as arguments.
+    """
+    q_sum_hh = get_q_sum_hh_jitted(p_l, q_l, fc_l, Z, ndv)
+    r = from_q_to_r_jitted(q_sum_hh, p_l, q_l, fc_l)
+    r_sum_filtered = nansum_ignore_nan_inf_jitted(r)
+    cs = get_v_out_jitted(q_sum_hh, p_l, q_l, fc_l, Z, ndv)
+    ev = get_ev_jitted(q_sum_hh, cs)
+    
+    # Calculate equity-weighted welfare (now in dollar terms)
+    equity_weighted_welfare = nansum_ignore_nan_inf_jitted(jnp.multiply(ev, weights))
+    
+    # Calculate revenue loss (in dollar terms)
+    loss = -1 * lambda_val * loss_function_jitted(r_sum_filtered - r0_sum_filtered)
+    
+    result = equity_weighted_welfare + loss
+    return result
+
+# JIT the updated function
+# We make lambda_val and weights static arguments because they don't change
+# during a *single* optimization run. This is crucial for JAX.
+get_result_jitted = jax.jit(get_result, static_argnames=['lambda_val', 'weights'])
+
+
+def objective0_lambda(param, Z, ndv, r0_sum_filtered, lambda_val, weights):
+    """
+    Wrapper for the optimizer that now passes lambda and weights through.
+    """
+    param = jnp.maximum(param, 0.01)
+    p_l, q_l, fc_l = param_to_pq0_jitted(param)
+    
+    # Pass lambda_val and weights to the core function
+    result = get_result_lambda(p_l, q_l, fc_l, Z, ndv, r0_sum_filtered, lambda_val, weights)
+    
+    # Optimizer minimizes, so we return the negative of our objective
+    return -1 * result
+
+# Create the median-normalized weights (do this once)
+equity_weights = create_median_normalized_weights(I)
+
+# --- STEP 2: Define the Lambda Grid and Run the Search ---
+
+# Start with a coarse grid and refine it later if needed
+lambda_grid = jnp.array([0.1, 0.5, 1.0, 1.5, 2.0, 5.0, 10.0])
+search_results = []
+
+status_quo_params = jnp.array([
+    3.09, 5.01-3.09, 8.54-5.01, 12.9-8.54, 14.41-12.9,
+    8.5, 10.8-8.5, 16.5-10.8, 37-16.5, 37-37
+])
+
+param0_low = jnp.array([3, 3, 3, 3, 3, 
+                    2, 
+                    6-2, 11-6, 20-11,
+                    8.5, 
+                    7.125, 7.125,7.125,7.125
+                    ])
+
+
+
+print("Starting grid search for implicit lambda...")
+
+for i, current_lambda in enumerate(lambda_grid):
+    print(f"\n--- Testing Lambda = {current_lambda:.2f} ({i+1}/{len(lambda_grid)}) ---")
+
+    # Define the function to be minimized for THIS specific lambda
+    # This is the key: we create a new objective function for each lambda value
+    objective_for_lambda = lambda x: objective0_lambda(x, Z_step, input_NDVI, r0_sum_filtered, current_lambda, equity_weights)
+    objective_jitted = jax.jit(objective_for_lambda)
+
+    # Use a consistent starting point for the optimization
+    param0_np = np.array(param0_low) # COBYQA works with NumPy
+    
+    # --- Define Realistic Bounds and Constraints ---
+
+    # Define the conservation constraint function for the optimizer.
+    # The constraint from your image is P(sum(q) <= Q_bar) >= 0.95.
+
+    # Create the nonlinear constraint object.
+    constraint_conserve = NonlinearConstraint(
+        lambda x: conservation_constraint_jitted(x, Z_step, input_NDVI), 
+        0.95, 1.0, jac='2-point', hess=BFGS()
+    )
+
+    try:
+        solution = cobyqa.minimize(
+            objective_jitted,
+            param0_np,
+            bounds=bounds0,
+            constraints=[constraint_conserve],
+            options={'disp': True, 'radius_init': 1, 'radius_final': 1e-3}
+        )
+
+        if solution.success:
+            optimal_params = jnp.array(solution.x)
+            
+            # --- STEP 3: Calculate the distance to the status quo ---
+            distance = jnp.sum((optimal_params - status_quo_params)**2)
+            print(f"Success! Distance to status quo: {distance:.4f}")
+            
+            search_results.append({
+                'lambda': current_lambda,
+                'distance': distance,
+                'optimal_params': optimal_params,
+                'success': True
+            })
+        else:
+            print("Optimization failed to converge.")
+            search_results.append({'lambda': current_lambda, 'distance': jnp.inf, 'success': False})
+
+    except Exception as e:
+        print(f"An error occurred during optimization: {e}")
+        search_results.append({'lambda': current_lambda, 'distance': jnp.inf, 'success': False})
+
+
+# --- STEP 4: Find and Report the Best Lambda ---
+
+print("\n--- Grid Search Complete ---")
+
+if not any(r['success'] for r in search_results):
+    print("No optimization runs were successful.")
+else:
+    # Find the result with the minimum distance
+    best_result = min([r for r in search_results if r['success']], key=lambda x: x['distance'])
+
+    implicit_lambda = best_result['lambda']
+    min_distance = best_result['distance']
+    best_params = best_result['optimal_params']
+
+    print(f"\nBest-fit (Implicit) Lambda: {implicit_lambda}")
+    print(f"Minimum Sum of Squared Distance: {min_distance:.4f}")
+    print("\nStatus Quo Parameters (param0):")
+    print(status_quo_params)
+    print("\nOptimal Parameters for Best-fit Lambda:")
+    print(best_params)
+
+
 ########################################
 ######### Change Just From Weather ##########
 ########################################
