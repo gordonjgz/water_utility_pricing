@@ -1,36 +1,31 @@
-# 💧 Rain or Shine? Optimal Utility Pricing under Extreme Weather
+# Spatial Heterogeneous Consumers: The Welfare Effect of UberPool
 
 **Author**: Gordon Ji  
 **Degree**: Ph.D. in Economics  
 **Advisor**: Dr. Eugenio Miravete  
 **Institution**: University of Texas at Austin  
-**Year**: 2025-2026
+**Year**: 2022
+**Award**: Outstanding 2nd Year Paper Award
 
 
 ---
 
 ## 📄 Abstract
 
-> As climate change amplifies extreme weather, water utilities face increasing difficulty in simultaneously ensuring revenue feasibility, promoting water conservation, and protecting low-income consumers.
-> This paper tests and concludes that price alone cannot achieve these competing policy goals under extreme weather.
-> Using granular household data from Austin, TX, and a structural demand model enhanced with satellite imagery-derived vegetation index, I find that because high-water users exist across all income levels, traditional tiered pricing doesn’t work as intended.
-> Furthermore, higher-income households—who are both weather-sensitive and surprisingly price-elastic—complicate the utility's ability to achieve its distributional objectives while meeting conservation and revenue targets.
-> When high-demand conditions (e.g., drought) make conservation measures necessary, low-income families experience an average welfare loss of $61 per month. Conversely, when low-demand conditions lead to revenue shortfalls for the utility, the resulting rate adjustments also impose a significant loss on this same group, averaging $64 per month.
-> These results highlight the necessity of complementary policies to achieve distributional goals.
-> For example, a program encouraging households to convert 20% of their lawns to water-saving landscapes (zeroscaping/xeriscaping) could generate approximately $57 per month in welfare for the lowest-income families, nearly offsetting the financial burden imposed by conservation policies during droughts.
-
+> Many economic research studies have been focusing on the demand and welfare estimation of the ride-hailing market, specifically for platforms like Uber and Lyft.
+> In this paper, I estimate the welfare effect of UberPool as a new product in the ride-hailing market, accounting for heterogeneous preferences within and across locations by using a discrete-type random coefficient nested logit model.
+> I find that, relative to the counterfactual worlds without UberPool, UberPool can increase consumer surplus by 31.58% - 33.51%.
+> Even a partially accessible UberPool by location is 2.57% higher on consumer surplus, compared to if only UberX were provided but with lower prices, which shows the magnitude of the variety effect in the ride-hailing market. 
 ---
 ## 📂 Repository Structure
 
 ```text
-├── pre_analysis/               # Data cleaning, GIS data, and NDVI
-├── demand/                     # Demand Estimation
-├── price_elasticity/           # Code to generate price elasticity
-├── preliminary_intuition/      # Code related to constructing preliminary intuition of the optimal Ramsey price
-├── counterfactual_temp/        # Counterfactual analysis that's not been used
-├── counterfactual_ramsey/      # Counterfactual analysis of Ramsey Pricing Model
-├── gordonji_jmp_2026.pdf       # Job Market Paper (Last edited Oct 2025)
-├── other_app_info/             # Other Materials of Job Market Application (Teaching Materials, CV, etc)
+├── estimation/                 # Code related to demand estimation
+├── intermediate/               # Intermediate Datasets
+├── prelim_graph.R              # Plots for preliminary analysis
+├── supply_side.R               # Code expanding to supply side analysis
+├── Counterfactual.R            # Code conducting counterfactual analysis
+├── raw/                        # Raw taxi data
 └── README.md                   # Project overview (this file)
 
 ```
@@ -38,19 +33,17 @@
 
 ## 🧠 Overview
 
-This repository accompanies my dissertation research on the intersection of utility pricing, climate variability, and economic welfare. It includes:
+This repository accompanies my research on the variety effect of UberPool. It includes:
 
-- A structural DCC model of household water demand
-- Counterfactual simulations of Ramsey pricing under different weather conditions
-- Estimation of the shadow cost of policy constraint under counterfactual weather conditions, especially for the lowest income stratum
-- The welfare benefit from the additional policies like Zeroscaping towards the lowest income stratum
+- A discrete-type random coefficient nested logit model to estimate the demand (also known as BCS)
+- Counterfactual simulations of removing UberPool
 
 ---
 
 ## 📊 Data
 
-The data comes from Austin Water's monthly transaction records.  
-Due to privacy constraints, raw data are not publicly included.  
+The data comes from public ride-hailing data from the  City of Chicago.
+https://data.cityofchicago.org/Transportation/Transportation-Network-Providers-Trips-2018-2022-/m6dm-c72p/about_data
 
 ---
 
