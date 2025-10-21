@@ -1,4 +1,4 @@
-# 💧 Rain or Shine? Optimal Utility Pricing under Extreme Weather
+# 💧 Rain or Shine? Optimal Utility Pricing under Different Weather Patterns
 
 **Author**: Gordon Ji  
 **Degree**: Ph.D. in Economics  
@@ -15,9 +15,10 @@
 > This paper tests and concludes that price alone cannot achieve these competing policy goals under extreme weather.
 > Using granular household data from Austin, TX, and a structural demand model enhanced with satellite imagery-derived vegetation index, I find that because high-water users exist across all income levels, traditional tiered pricing doesn’t work as intended.
 > Furthermore, higher-income households—who are both weather-sensitive and surprisingly price-elastic—complicate the utility's ability to achieve its distributional objectives while meeting conservation and revenue targets.
-> When high-demand conditions (e.g., drought) make conservation measures necessary, low-income families experience an average welfare loss of $61 per month. Conversely, when low-demand conditions lead to revenue shortfalls for the utility, the resulting rate adjustments also impose a significant loss on this same group, averaging $64 per month.
-> These results highlight the necessity of complementary policies to achieve distributional goals.
-> For example, a program encouraging households to convert 20% of their lawns to water-saving landscapes (zeroscaping/xeriscaping) could generate approximately $57 per month in welfare for the lowest-income families, nearly offsetting the financial burden imposed by conservation policies during droughts.
+> When high-demand conditions (e.g., drought) make conservation measures necessary, low-income families experience an average welfare loss of $74 per month.
+> Conversely, when low-demand conditions lead to revenue shortfalls for the utility, the resulting rate adjustments create welfare increase for the same group, averaging $47 per month.
+> These results highlight the necessity of complementary policies to achieve distributional goals when demand increases.
+> For example, a program encouraging households to convert 30% of their lawns to water-saving landscapes (zeroscaping/xeriscaping) could generate approximately $70 per month in welfare for the lowest-income families, nearly offsetting the financial burden imposed by conservation policies during droughts.
 
 ---
 ## 📂 Repository Structure
