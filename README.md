@@ -29,12 +29,8 @@
 ├── preliminary_intuition/      # Code related to constructing preliminary intuition of the optimal Ramsey price
 ├── counterfactual_temp/        # Counterfactual analysis that's not been used
 ├── counterfactual_ramsey/      # Counterfactual analysis of Ramsey Pricing Model
-├── README.md                   # Project overview (this file)
-├── Gordon_JI_CV.pdf            # CV_academia
-├── Gordon_JI-CV.pdf            # CV_industry
+├── other_app_info/             # Folders contain other application info
 ├── gordonji_jmp_2026.pdf       # Job Market Paper (Last edited June 2025)
-├── other_paper/                # Other Paper authored by me
-├── teaching/                   # Related Teaching Materials (Teaching Statement, Syllabus, etc. )
 └── README.md                   # Project overview (this file)
 
 ```
