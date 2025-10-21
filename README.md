@@ -11,14 +11,13 @@
 
 ## 📄 Abstract
 
-> As climate change amplifies extreme weather, water utilities face increasing difficulty in simultaneously ensuring revenue feasibility, promoting water conservation, and protecting low-income consumers.
-> This paper tests and concludes that price alone cannot achieve these competing policy goals under extreme weather.
+> As climate change amplifies more volatile weather patterns, water utilities face increasing difficulty in simultaneously ensuring revenue feasibility, promoting water conservation, and protecting low-income consumers.
+> This paper tests and concludes that price alone cannot achieve these competing policy goals under different weather patterns.
 > Using granular household data from Austin, TX, and a structural demand model enhanced with satellite imagery-derived vegetation index, I find that because high-water users exist across all income levels, traditional tiered pricing doesn’t work as intended.
-> Furthermore, higher-income households—who are both weather-sensitive and surprisingly price-elastic—complicate the utility's ability to achieve its distributional objectives while meeting conservation and revenue targets.
-> When high-demand conditions (e.g., drought) make conservation measures necessary, low-income families experience an average welfare loss of $74 per month.
-> Conversely, when low-demand conditions lead to revenue shortfalls for the utility, the resulting rate adjustments create welfare increase for the same group, averaging $47 per month.
-> These results highlight the necessity of complementary policies to achieve distributional goals when demand increases.
-> For example, a program encouraging households to convert 30% of their lawns to water-saving landscapes (zeroscaping/xeriscaping) could generate approximately $70 per month in welfare for the lowest-income families, nearly offsetting the financial burden imposed by conservation policies during droughts.
+> Furthermore, higher-income households—who are both weather-sensitive and surprisingly price-elastic—complicate the utility's ability to achieve its distributional objectives while meeting the conservation target.
+> When high-demand conditions (e.g., drought) make conservation measures necessary, low-income families experience an average welfare loss of \$74 per month.
+> This highlights the necessity of complementary policies to achieve distributional goals when demand increases.
+> For example, a program encouraging households to convert 30\% of their lawns to water-saving landscapes (zeroscaping/xeriscaping) could generate approximately \$70 per month in welfare for the lowest-income families, nearly offsetting the financial burden imposed by conservation policies during droughts.
 
 ---
 ## 📂 Repository Structure
