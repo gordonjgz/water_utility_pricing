@@ -1,4 +1,4 @@
-# 💧 Rain or Shine? Optimal Utility Pricing under Extreme Weather
+# 💧 Rain or Shine? Optimal Utility Pricing under Different Weather Patterns
 
 **Author**: Gordon Ji  
 **Degree**: Ph.D. in Economics  
@@ -11,13 +11,13 @@
 
 ## 📄 Abstract
 
-> As climate change amplifies extreme weather, water utilities face increasing difficulty in simultaneously ensuring revenue feasibility, promoting water conservation, and protecting low-income consumers.
-> This paper tests and concludes that price alone cannot achieve these competing policy goals under extreme weather.
+> As climate change amplifies more volatile weather patterns, water utilities face increasing difficulty in simultaneously ensuring revenue feasibility, promoting water conservation, and protecting low-income consumers.
+> This paper tests and concludes that price alone cannot achieve these competing policy goals under different weather patterns.
 > Using granular household data from Austin, TX, and a structural demand model enhanced with satellite imagery-derived vegetation index, I find that because high-water users exist across all income levels, traditional tiered pricing doesn’t work as intended.
-> Furthermore, higher-income households—who are both weather-sensitive and surprisingly price-elastic—complicate the utility's ability to achieve its distributional objectives while meeting conservation and revenue targets.
-> When high-demand conditions (e.g., drought) make conservation measures necessary, low-income families experience an average welfare loss of $61 per month. Conversely, when low-demand conditions lead to revenue shortfalls for the utility, the resulting rate adjustments also impose a significant loss on this same group, averaging $64 per month.
-> These results highlight the necessity of complementary policies to achieve distributional goals.
-> For example, a program encouraging households to convert 20% of their lawns to water-saving landscapes (zeroscaping/xeriscaping) could generate approximately $57 per month in welfare for the lowest-income families, nearly offsetting the financial burden imposed by conservation policies during droughts.
+> Furthermore, higher-income households—who are both weather-sensitive and surprisingly price-elastic—complicate the utility's ability to achieve its distributional objectives while meeting the conservation target.
+> When high-demand conditions (e.g., drought) make conservation measures necessary, low-income families experience an average welfare loss of \$74 per month.
+> This highlights the necessity of complementary policies to achieve distributional goals when demand increases.
+> For example, a program encouraging households to convert 30\% of their lawns to water-saving landscapes (zeroscaping/xeriscaping) could generate approximately \$70 per month in welfare for the lowest-income families, nearly offsetting the financial burden imposed by conservation policies during droughts.
 
 ---
 ## 📂 Repository Structure
@@ -29,12 +29,8 @@
 ├── preliminary_intuition/      # Code related to constructing preliminary intuition of the optimal Ramsey price
 ├── counterfactual_temp/        # Counterfactual analysis that's not been used
 ├── counterfactual_ramsey/      # Counterfactual analysis of Ramsey Pricing Model
-├── README.md                   # Project overview (this file)
-├── Gordon_JI_CV.pdf            # CV_academia
-├── Gordon_JI-CV.pdf            # CV_industry
+├── other_app_info/             # Folders contain other application info
 ├── gordonji_jmp_2026.pdf       # Job Market Paper (Last edited June 2025)
-├── other_paper/                # Other Paper authored by me
-├── teaching/                   # Related Teaching Materials (Teaching Statement, Syllabus, etc. )
 └── README.md                   # Project overview (this file)
 
 ```
