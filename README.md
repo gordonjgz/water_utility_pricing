@@ -1,10 +1,10 @@
-# 💧 Rain or Shine? Optimal Utility Pricing under Different Weather Patterns
+# Rain or Shine? Optimal Utility Pricing under Different Weather Patterns
 
 **Author**: Guozhen (Gordon) Ji  
-**Degree**: Ph.D. in Economics  
+**Current Affiliation**: Associate, Econic Partners
+**Degree**: Ph.D. in Economics (2026) 
 **Advisor**: Dr. Eugenio Miravete  
 **Institution**: University of Texas at Austin  
-**Year**: 2026
 
 
 ---
