@@ -1,15 +1,15 @@
 # 💧 Rain or Shine? Optimal Utility Pricing under Different Weather Patterns
 
-**Author**: Gordon Ji  
+**Author**: Guozhen (Gordon) Ji  
 **Degree**: Ph.D. in Economics  
 **Advisor**: Dr. Eugenio Miravete  
 **Institution**: University of Texas at Austin  
-**Year**: 2025-2026
+**Year**: 2026
 
 
 ---
 
-## 📄 Abstract
+## Abstract
 
 > As climate change amplifies more volatile weather patterns, water utilities face increasing difficulty in simultaneously ensuring revenue feasibility, promoting water conservation, and protecting low-income consumers.
 > This paper tests and concludes that price alone cannot achieve these competing policy goals under different weather patterns.
@@ -20,7 +20,7 @@
 > For example, a program encouraging households to convert 30\% of their lawns to water-saving landscapes (zeroscaping/xeriscaping) could generate approximately \$70 per month in welfare for the lowest-income families, nearly offsetting the financial burden imposed by conservation policies during droughts.
 
 ---
-## 📂 Repository Structure
+## Repository Structure
 
 ```text
 ├── pre_analysis/               # Data cleaning, GIS data, and NDVI
@@ -31,13 +31,14 @@
 ├── counterfactual_temp/        # Counterfactual analysis that's not been used
 ├── counterfactual_ramsey/      # Counterfactual analysis of Ramsey Pricing Model
 ├── other_app_info/             # Folders contain other application info
-├── gordonji_jmp_2026.pdf       # Job Market Paper (Last edited June 2025)
+├── Austin_Water.pdf            # Formatted Paper (Last edited Oct 2026)
+├── Austin_Water_Online_Appendix.pdf            # Online Appendix (Last edited Oct 2026)
 └── README.md                   # Project overview (this file)
 
 ```
 ---
 
-## 🧠 Overview
+## Overview
 
 This repository accompanies my dissertation research on the intersection of utility pricing, climate variability, and economic welfare. It includes:
 
@@ -48,23 +49,22 @@ This repository accompanies my dissertation research on the intersection of util
 
 ---
 
-## 📊 Data
+## Data
 
 The data comes from Austin Water's monthly transaction records.  
 Due to privacy constraints, raw data are not publicly included.  
 
 ---
 
-## 📝 License
+## License
 
 This project is licensed under the MIT License – see the [LICENSE](LICENSE) file for details.
 
 
 ---
 
-## 🙋‍♂️ Contact
+## Contact
 
-If you have questions or want to collaborate, feel free to reach out:  
-📧 [guozhenj@utexas.edu], [gordonjgz@gmail.com]
+If you have questions or want to collaborate, feel free to reach out: [gordonjgz@gmail.com]
 
 ---
